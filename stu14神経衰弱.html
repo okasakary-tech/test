@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji Memory Battle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background: #f0f4f8;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .perspective {
+            perspective: 1000px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+            color: white;
+            border: 3px solid white;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .card-front {
+            background-color: white;
+            transform: rotateY(180deg);
+            border: 3px solid #6366f1;
+            font-size: 2rem;
+        }
+
+        .turn-indicator {
+            transition: all 0.3s ease;
+            border: 4px solid transparent;
+            border-radius: 20px;
+        }
+
+        .active-turn {
+            transform: scale(1.05);
+            background: white;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+            border-color: #6366f1;
+        }
+
+        @keyframes match-anim {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); rotate: 5deg; }
+            100% { transform: scale(1); }
+        }
+        .matched-pair {
+            animation: match-anim 0.5s ease-in-out;
+            opacity: 0.4;
+        }
+
+        .hidden-step {
+            display: none;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen select-none p-2">
+
+    <div id="game-container" class="relative w-full max-w-lg h-[95vh] bg-white rounded-[40px] shadow-2xl overflow-hidden border-8 border-indigo-100 flex flex-col">
+        
+        <!-- CPU Status -->
+        <div id="cpu-area" class="h-1/6 p-4 flex items-center justify-around turn-indicator">
+            <div class="flex flex-col items-center">
+                <span class="text-3xl mb-1">🤖</span>
+                <span class="text-xs font-bold text-slate-500 uppercase">CPU</span>
+            </div>
+            <div class="text-center">
+                <div id="cpu-score" class="text-4xl font-black text-indigo-500">0</div>
+                <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Pairs Found</div>
+            </div>
+        </div>
+
+        <!-- Board Area -->
+        <div class="flex-grow bg-indigo-50/30 p-4 flex items-center justify-center overflow-auto">
+            <div id="game-board" class="grid gap-2 w-full max-w-[420px]">
+                <!-- Cards generated here -->
+            </div>
+        </div>
+
+        <!-- Player Status -->
+        <div id="player-area" class="h-1/6 p-4 flex items-center justify-around turn-indicator">
+            <div class="text-center">
+                <div id="player-score" class="text-4xl font-black text-rose-500">0</div>
+                <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Pairs Found</div>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-3xl mb-1">👤</span>
+                <span class="text-xs font-bold text-slate-500 uppercase">You</span>
+            </div>
+        </div>
+
+        <!-- Game Messages -->
+        <div id="turn-msg" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 bg-white/95 px-8 py-3 rounded-full shadow-2xl border-2 border-indigo-300 font-black text-indigo-600 scale-0 transition-transform text-lg">
+            Player Turn
+        </div>
+
+        <!-- Overlay / Difficulty Selection -->
+        <div id="overlay" class="absolute inset-0 bg-indigo-900/95 z-50 flex flex-col items-center justify-center text-white p-6 transition-opacity duration-500">
+            <div class="text-6xl mb-4">🧠</div>
+            <h1 id="overlay-title" class="text-3xl font-black mb-2 text-center text-white uppercase tracking-tighter">Memory Battle</h1>
+            
+            <!-- Step 1: Difficulty -->
+            <div id="step-difficulty" class="w-full max-w-[280px]">
+                <p class="text-indigo-200 mb-6 text-center text-sm leading-relaxed">
+                    むずかしさをえらんでね！
+                </p>
+                <div class="grid grid-cols-1 gap-3">
+                    <button onclick="selectDifficulty('easy')" class="bg-emerald-500 hover:bg-emerald-400 text-white font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-95 flex flex-col items-center">
+                        かんたん
+                        <span class="text-[10px] font-normal opacity-80">12枚 / CPU: よわい</span>
+                    </button>
+                    <button onclick="selectDifficulty('normal')" class="bg-amber-500 hover:bg-amber-400 text-white font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-95 flex flex-col items-center">
+                        ふつう
+                        <span class="text-[10px] font-normal opacity-80">16枚 / CPU: ふつう</span>
+                    </button>
+                    <button onclick="selectDifficulty('hard')" class="bg-rose-500 hover:bg-rose-400 text-white font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-95 flex flex-col items-center">
+                        むずかしい
+                        <span class="text-[10px] font-normal opacity-80">20枚 / CPU: つよい</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Turn Selection -->
+            <div id="step-turn" class="w-full max-w-[280px] hidden-step">
+                <p class="text-indigo-200 mb-6 text-center text-sm leading-relaxed">
+                    どっちから はじめる？
+                </p>
+                <div class="grid grid-cols-1 gap-3">
+                    <button onclick="selectFirstMove('player')" class="bg-indigo-500 hover:bg-indigo-400 text-white font-black py-5 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-3">
+                        <span class="text-2xl">👤</span> せんこう (自分)
+                    </button>
+                    <button onclick="selectFirstMove('cpu')" class="bg-slate-600 hover:bg-slate-500 text-white font-black py-5 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-3">
+                        <span class="text-2xl">🤖</span> こうこう (CPU)
+                    </button>
+                </div>
+                <button onclick="resetToDifficulty()" class="mt-6 text-indigo-300 text-xs w-full text-center hover:text-white">← もどる</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const emojiPool = ['🐶', '🐱', '🦊', '🦁', '🐸', '🐼', '🐯', '🐰', '🐨', '🐵', '🐘', '🦒'];
+        
+        const difficultyConfig = {
+            easy: { pairs: 6, cols: 3, memoryAccuracy: 0.4 },
+            normal: { pairs: 8, cols: 4, memoryAccuracy: 0.75 },
+            hard: { pairs: 10, cols: 4, memoryAccuracy: 1.0 }
+        };
+
+        let gameState = {
+            cards: [],
+            flippedIndices: [],
+            scores: { player: 0, cpu: 0 },
+            turn: 'player',
+            isProcessing: false,
+            memory: {}, // {index: emoji}
+            currentDiff: 'normal',
+            isActive: false
+        };
+
+        const board = document.getElementById('game-board');
+        const playerScoreEl = document.getElementById('player-score');
+        const cpuScoreEl = document.getElementById('cpu-score');
+        const playerArea = document.getElementById('player-area');
+        const cpuArea = document.getElementById('cpu-area');
+        const turnMsg = document.getElementById('turn-msg');
+        const overlay = document.getElementById('overlay');
+        const stepDifficulty = document.getElementById('step-difficulty');
+        const stepTurn = document.getElementById('step-turn');
+
+        function selectDifficulty(level) {
+            gameState.currentDiff = level;
+            stepDifficulty.classList.add('hidden-step');
+            stepTurn.classList.remove('hidden-step');
+        }
+
+        function resetToDifficulty() {
+            stepDifficulty.classList.remove('hidden-step');
+            stepTurn.classList.add('hidden-step');
+        }
+
+        function selectFirstMove(firstPlayer) {
+            gameState.turn = firstPlayer;
+            startGame();
+        }
+
+        function startGame() {
+            const config = difficultyConfig[gameState.currentDiff];
+            
+            // Setup cards
+            const selectedEmojis = emojiPool.slice(0, config.pairs);
+            gameState.cards = [...selectedEmojis, ...selectedEmojis].sort(() => Math.random() - 0.5);
+            
+            // Reset state
+            gameState.scores = { player: 0, cpu: 0 };
+            gameState.flippedIndices = [];
+            gameState.memory = {};
+            gameState.isProcessing = false;
+            gameState.isActive = true;
+
+            updateUI();
+            renderBoard(config.cols);
+            
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            
+            if (gameState.turn === 'player') {
+                showTurnMsg('あなたの番！');
+            } else {
+                showTurnMsg('CPUの番...');
+                setTimeout(cpuTurn, 1500);
+            }
+        }
+
+        function renderBoard(cols) {
+            board.innerHTML = '';
+            board.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+            
+            gameState.cards.forEach((emoji, index) => {
+                const card = document.createElement('div');
+                card.className = 'card aspect-[3/4] perspective cursor-pointer';
+                card.innerHTML = `
+                    <div class="card-inner w-full h-full">
+                        <div class="card-back text-2xl">?</div>
+                        <div class="card-front text-4xl">${emoji}</div>
+                    </div>
+                `;
+                card.onclick = () => handleCardClick(index);
+                board.appendChild(card);
+            });
+        }
+
+        function handleCardClick(index) {
+            if (gameState.turn !== 'player' || gameState.isProcessing || !gameState.isActive) return;
+            if (gameState.flippedIndices.includes(index)) return;
+            
+            const cardElements = document.querySelectorAll('.card');
+            if (cardElements[index].classList.contains('matched')) return;
+
+            flipCard(index);
+        }
+
+        function flipCard(index) {
+            const cardElements = document.querySelectorAll('.card');
+            if (!cardElements[index]) return;
+            
+            cardElements[index].classList.add('flipped');
+            gameState.flippedIndices.push(index);
+
+            // CPU memory logic
+            if (Math.random() < difficultyConfig[gameState.currentDiff].memoryAccuracy) {
+                gameState.memory[index] = gameState.cards[index];
+            }
+
+            if (gameState.flippedIndices.length === 2) {
+                gameState.isProcessing = true;
+                setTimeout(checkMatch, 1000);
+            }
+        }
+
+        function checkMatch() {
+            const [idx1, idx2] = gameState.flippedIndices;
+            const cardElements = document.querySelectorAll('.card');
+            
+            if (gameState.cards[idx1] === gameState.cards[idx2]) {
+                gameState.scores[gameState.turn]++;
+                cardElements[idx1].classList.add('matched', 'matched-pair');
+                cardElements[idx2].classList.add('matched', 'matched-pair');
+                
+                delete gameState.memory[idx1];
+                delete gameState.memory[idx2];
+
+                updateUI();
+                gameState.flippedIndices = [];
+                gameState.isProcessing = false;
+
+                if (gameState.scores.player + gameState.scores.cpu === difficultyConfig[gameState.currentDiff].pairs) {
+                    endGame();
+                } else if (gameState.turn === 'cpu') {
+                    setTimeout(cpuTurn, 800);
+                }
+            } else {
+                cardElements[idx1].classList.remove('flipped');
+                cardElements[idx2].classList.remove('flipped');
+                gameState.flippedIndices = [];
+                
+                gameState.turn = (gameState.turn === 'player') ? 'cpu' : 'player';
+                gameState.isProcessing = false;
+                updateUI();
+                
+                if (gameState.turn === 'cpu') {
+                    showTurnMsg('CPUの番...');
+                    setTimeout(cpuTurn, 1000);
+                } else {
+                    showTurnMsg('あなたの番！');
+                }
+            }
+        }
+
+        function cpuTurn() {
+            if (gameState.turn !== 'cpu' || !gameState.isActive) return;
+
+            const cardElements = document.querySelectorAll('.card');
+            const availableIndices = [];
+            cardElements.forEach((el, i) => {
+                if (!el.classList.contains('matched') && !el.classList.contains('flipped')) {
+                    availableIndices.push(i);
+                }
+            });
+
+            if (availableIndices.length === 0) return;
+
+            let move1, move2;
+            const memEntries = Object.entries(gameState.memory);
+            
+            // 1. Search for pairs in memory
+            for (let i = 0; i < memEntries.length; i++) {
+                for (let j = i + 1; j < memEntries.length; j++) {
+                    if (memEntries[i][1] === memEntries[j][1]) {
+                        move1 = parseInt(memEntries[i][0]);
+                        move2 = parseInt(memEntries[j][0]);
+                        break;
+                    }
+                }
+                if (move1 !== undefined) break;
+            }
+
+            if (move1 !== undefined) {
+                flipCard(move1);
+                setTimeout(() => flipCard(move2), 800);
+            } else {
+                // 2. Pick first random
+                move1 = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+                flipCard(move1);
+
+                setTimeout(() => {
+                    // 3. Check if second one is in memory
+                    const neededEmoji = gameState.cards[move1];
+                    let knownIdx = -1;
+                    for (let idx in gameState.memory) {
+                        if (gameState.memory[idx] === neededEmoji && parseInt(idx) !== move1) {
+                            knownIdx = parseInt(idx);
+                            break;
+                        }
+                    }
+
+                    if (knownIdx !== -1) {
+                        flipCard(knownIdx);
+                    } else {
+                        // 4. Pick second random
+                        const remaining = availableIndices.filter(i => i !== move1);
+                        move2 = remaining[Math.floor(Math.random() * remaining.length)];
+                        flipCard(move2);
+                    }
+                }, 800);
+            }
+        }
+
+        function updateUI() {
+            playerScoreEl.textContent = gameState.scores.player;
+            cpuScoreEl.textContent = gameState.scores.cpu;
+
+            if (gameState.turn === 'player') {
+                playerArea.classList.add('active-turn');
+                cpuArea.classList.remove('active-turn');
+            } else {
+                cpuArea.classList.add('active-turn');
+                playerArea.classList.remove('active-turn');
+            }
+        }
+
+        function showTurnMsg(text) {
+            turnMsg.textContent = text;
+            turnMsg.classList.remove('scale-0');
+            turnMsg.classList.add('scale-100');
+            setTimeout(() => {
+                turnMsg.classList.remove('scale-100');
+                turnMsg.classList.add('scale-0');
+            }, 1200);
+        }
+
+        function endGame() {
+            gameState.isActive = false;
+            let result = '';
+            if (gameState.scores.player > gameState.scores.cpu) result = 'YOU WIN! 🎉';
+            else if (gameState.scores.player < gameState.scores.cpu) result = 'CPU WIN... 🤖';
+            else result = 'DRAW! 🤝';
+
+            document.getElementById('overlay-title').textContent = result;
+            
+            // Show start screen again
+            setTimeout(() => {
+                stepDifficulty.classList.remove('hidden-step');
+                stepTurn.classList.add('hidden-step');
+                overlay.classList.remove('opacity-0', 'pointer-events-none');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
