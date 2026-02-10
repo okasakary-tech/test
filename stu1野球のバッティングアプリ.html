@@ -1,0 +1,415 @@
+"<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Baseball Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a2e1a;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #2d5a27 0%, #1a3c1a 100%);
+        }
+        canvas {
+            border: 4px solid #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            max-width: 95%;
+            max-height: 65vh;
+            background-color: #348C31;
+        }
+        .ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .message-box {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            text-align: center;
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 4px 4px 8px rgba(0,0,0,1);
+            pointer-events: none;
+            z-index: 20;
+        }
+        .pitch-type-box {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: #ffeb3b;
+            display: none;
+        }
+        .timing-bar-container {
+            position: absolute;
+            bottom: 120px;
+            width: 300px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid white;
+            border-radius: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        .timing-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .hit-zone {
+            position: absolute;
+            right: 10%;
+            width: 20%;
+            height: 100%;
+            background: rgba(0, 255, 0, 0.4);
+            border-left: 2px solid #fff;
+            border-right: 2px solid #fff;
+        }
+        .controls {
+            margin-top: 20px;
+            z-index: 10;
+        }
+        button {
+            padding: 20px 60px;
+            font-size: 1.75rem;
+            font-weight: bold;
+            background: linear-gradient(to bottom, #ff4d4d, #b30000);
+            color: white;
+            border: 3px solid #fff;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            user-select: none;
+        }
+        button:active { transform: scale(0.9); }
+        
+        .shake { animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="ui-panel">
+        <div class="text-xl font-bold mb-1">SCORE: <span id="score">0</span></div>
+        <div class="text-md">OUTS: <span id="outs">0</span> / 3</div>
+        <div class="text-md">BEST: <span id="highscore">0</span></div>
+    </div>
+
+    <div id="pitchType" class="pitch-type-box">STRAIGHT</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="message" class="message-box">READY?</div>
+
+    <div id="timingContainer" class="timing-bar-container">
+        <div class="hit-zone"></div>
+        <div id="timingFill" class="timing-bar-fill"></div>
+    </div>
+
+    <div class="controls">
+        <button id="swingBtn">SWING!</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const outsEl = document.getElementById('outs');
+    const highscoreEl = document.getElementById('highscore');
+    const messageEl = document.getElementById('message');
+    const pitchTypeEl = document.getElementById('pitchType');
+    const swingBtn = document.getElementById('swingBtn');
+    const timingContainer = document.getElementById('timingContainer');
+    const timingFill = document.getElementById('timingFill');
+
+    let score = 0;
+    let outs = 0;
+    let highscore = 0;
+    let gameState = 'IDLE'; 
+    let ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, targetX: 0, active: false, radius: 12 };
+    let bat = { swinging: false };
+    
+    function resize() {
+        canvas.width = 600;
+        canvas.height = 400;
+    }
+    resize();
+
+    const PITCH_START_Z = 1200;
+    const HOME_PLATE_Y = canvas.height - 80;
+
+    function initGame() {
+        score = 0;
+        outs = 0;
+        updateUI();
+        gameState = 'PREPARING';
+        startCountdown();
+    }
+
+    async function startCountdown() {
+        if (outs >= 3) return;
+        messageEl.style.color = "white";
+        pitchTypeEl.style.display = "none";
+        for(let i=2; i>0; i--) {
+            messageEl.textContent = i;
+            await new Promise(r => setTimeout(r, 600));
+        }
+        messageEl.textContent = "GO!";
+        setTimeout(() => { if(gameState === 'PREPARING') pitchBall(); }, 400);
+    }
+
+    function pitchBall() {
+        gameState = 'PITCHING';
+        messageEl.textContent = "";
+        timingContainer.style.display = 'block';
+        
+        ball.active = true;
+        ball.z = PITCH_START_Z;
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2 - 30;
+        ball.targetX = canvas.width / 2 + (Math.random() - 0.5) * 40; 
+        
+        // Randomize pitch type
+        const rand = Math.random();
+        let speedMultiplier = 1;
+        if (rand > 0.8) {
+            pitchTypeEl.textContent = "FAST BALL!";
+            pitchTypeEl.style.color = "#ff5252";
+            speedMultiplier = 1.4;
+        } else if (rand < 0.2) {
+            pitchTypeEl.textContent = "SLOW BALL...";
+            pitchTypeEl.style.color = "#4facfe";
+            speedMultiplier = 0.6;
+        } else {
+            pitchTypeEl.textContent = "STRAIGHT";
+            pitchTypeEl.style.color = "#ffeb3b";
+            speedMultiplier = 1.0;
+        }
+        pitchTypeEl.style.display = "block";
+        
+        const baseSpeed = 15 + Math.min(score / 3, 10);
+        ball.vz = -(baseSpeed * speedMultiplier);
+        
+        const framesToPlate = Math.abs(PITCH_START_Z / ball.vz);
+        ball.vx = (ball.targetX - ball.x) / framesToPlate;
+        ball.vy = 0.8; 
+    }
+
+    function swing() {
+        if (gameState === 'IDLE' || gameState === 'GAMEOVER') {
+            initGame();
+            return;
+        }
+
+        if (gameState === 'PITCHING' && !bat.swinging) {
+            bat.swinging = true;
+            const timing = ball.z;
+            
+            // Optimal hit zone: z is near 0
+            if (timing < 100 && timing > -60) {
+                hitBall(timing);
+            } else {
+                strike(timing > 100 ? "TOO EARLY!" : "MISS!");
+            }
+            setTimeout(() => { bat.swinging = false; }, 300);
+        }
+    }
+
+    function hitBall(timing) {
+        gameState = 'HIT';
+        timingContainer.style.display = 'none';
+        pitchTypeEl.style.display = "none";
+        const absoluteTiming = Math.abs(timing);
+        
+        ball.vz = 25 + (Math.random() * 15);
+        ball.vx = (ball.x - (canvas.width / 2)) * 3 + (Math.random() - 0.5) * 15;
+        ball.vy = -12 - (Math.random() * 15);
+
+        if (absoluteTiming < 20) {
+            messageEl.textContent = "HOMERUN!!!";
+            messageEl.style.color = "#ffff00";
+            score += 4;
+            canvas.classList.add('shake');
+            setTimeout(() => canvas.classList.remove('shake'), 200);
+        } else if (absoluteTiming < 50) {
+            messageEl.textContent = "NICE HIT!";
+            messageEl.style.color = "#00ff00";
+            score += 2;
+        } else {
+            messageEl.textContent = "HIT";
+            messageEl.style.color = "#ffffff";
+            score += 1;
+        }
+        
+        updateUI();
+        setTimeout(() => { 
+            if (outs < 3) {
+                gameState = 'PREPARING';
+                startCountdown();
+            }
+        }, 2000);
+    }
+
+    function strike(txt = "STRIKE!") {
+        gameState = 'STRIKE_OUT';
+        timingContainer.style.display = 'none';
+        pitchTypeEl.style.display = "none";
+        messageEl.textContent = txt;
+        messageEl.style.color = "#ff4d4d";
+        outs++;
+        updateUI();
+
+        if (outs >= 3) {
+            gameOver();
+        } else {
+            setTimeout(() => { 
+                if (outs < 3) {
+                    gameState = 'PREPARING';
+                    startCountdown();
+                }
+            }, 1200);
+        }
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        messageEl.textContent = "GAME OVER";
+        messageEl.style.color = "#ff0000";
+        if (score > highscore) highscore = score;
+        updateUI();
+        swingBtn.textContent = "RETRY";
+    }
+
+    function updateUI() {
+        scoreEl.textContent = score;
+        outsEl.textContent = outs;
+        highscoreEl.textContent = highscore;
+        if (gameState !== 'GAMEOVER') swingBtn.textContent = "SWING!";
+    }
+
+    swingBtn.addEventListener('mousedown', (e) => { e.preventDefault(); swing(); });
+    swingBtn.addEventListener('touchstart', (e) => { e.preventDefault(); swing(); });
+    window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); swing(); } });
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Ground
+        ctx.fillStyle = '#2d5a27';
+        ctx.beginPath();
+        ctx.moveTo(canvas.width/2 - 60, canvas.height/2);
+        ctx.lineTo(canvas.width/2 + 60, canvas.height/2);
+        ctx.lineTo(canvas.width + 200, canvas.height);
+        ctx.lineTo(-200, canvas.height);
+        ctx.fill();
+
+        // Home plate
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.beginPath();
+        ctx.moveTo(canvas.width/2 - 40, HOME_PLATE_Y);
+        ctx.lineTo(canvas.width/2 + 40, HOME_PLATE_Y);
+        ctx.lineTo(canvas.width/2 + 50, HOME_PLATE_Y + 20);
+        ctx.lineTo(canvas.width/2 - 50, HOME_PLATE_Y + 20);
+        ctx.fill();
+
+        // Ball Logic
+        if (ball.active) {
+            const scale = 1200 / (1200 + ball.z);
+            const displaySize = ball.radius * scale;
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(ball.x, HOME_PLATE_Y + 15, displaySize * 1.5, displaySize * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ball Color
+            let ballColor = '#ffffff';
+            if (gameState === 'PITCHING') {
+                // Update Timing Bar
+                const progress = 1 - (ball.z / PITCH_START_Z);
+                timingFill.style.width = (progress * 100) + "%";
+                if (ball.z < 100 && ball.z > -50) ballColor = '#ffff00';
+            }
+
+            ctx.fillStyle = ballColor;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, displaySize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Red stitch
+            ctx.strokeStyle = '#ff4d4d';
+            ctx.lineWidth = 1 * scale;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, displaySize, 0.2, 0.8);
+            ctx.stroke();
+
+            // Move
+            if (gameState === 'PITCHING') {
+                ball.z += ball.vz;
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+                if (ball.z < -150) { ball.active = false; strike("TOO LATE!"); }
+            } else if (gameState === 'HIT') {
+                ball.z += ball.vz; ball.x += ball.vx; ball.y += ball.vy;
+                ball.vy += 0.6; 
+                if (ball.y > canvas.height + 100 || ball.z > 2500) ball.active = false;
+            }
+        }
+
+        // Draw Bat
+        ctx.save();
+        ctx.translate(canvas.width / 2 + 70, HOME_PLATE_Y - 20);
+        if (bat.swinging) {
+            ctx.rotate(-Math.PI * 0.7);
+            ctx.fillStyle = '#d2b48c';
+        } else {
+            ctx.rotate(0.3);
+            ctx.fillStyle = '#8d6e63';
+        }
+        ctx.beginPath();
+        ctx.roundRect(-10, -90, 22, 110, 5);
+        ctx.fill();
+        ctx.restore();
+
+        requestAnimationFrame(draw);
+    }
+    draw();
+</script>
+
+</body>
+</html>"

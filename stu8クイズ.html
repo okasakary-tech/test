@@ -1,0 +1,281 @@
+"<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High School Quiz Master</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans JP', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
+        .progress-bar { transition: width 0.5s ease-in-out; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-emerald-400 via-teal-500 to-blue-600 min-h-screen flex items-center justify-center p-4">
+
+    <!-- App Container -->
+    <div id="app" class="max-w-2xl w-full glass rounded-3xl shadow-2xl overflow-hidden p-6 md:p-10 relative">
+        
+        <!-- Progress Header -->
+        <div id="quiz-header" class="mb-8">
+            <div class="flex justify-between items-center mb-2 text-sm font-bold text-gray-600">
+                <span id="current-question-num">第 1 問 / 10</span>
+                <span id="score-display">スコア: 0</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="progress-bar" class="bg-teal-600 h-2.5 rounded-full progress-bar" style="width: 10%"></div>
+            </div>
+        </div>
+
+        <!-- Question Section -->
+        <div id="question-container" class="fade-in">
+            <h2 id="question-text" class="text-xl md:text-2xl font-bold text-gray-800 mb-8 leading-relaxed">
+                <!-- Question text here -->
+            </h2>
+            
+            <div id="options-grid" class="grid grid-cols-1 gap-4 mb-8">
+                <!-- Buttons will be injected here -->
+            </div>
+
+            <!-- Hint Section -->
+            <div id="hint-box" class="hidden">
+                <button id="hint-toggle" class="text-teal-700 text-sm font-bold flex items-center gap-2 hover:underline mb-4">
+                    <i class="fas fa-lightbulb"></i> ヒントを表示
+                </button>
+                <p id="hint-text" class="hidden text-sm text-gray-500 italic bg-teal-50 p-3 rounded-lg border-l-4 border-teal-400"></p>
+            </div>
+        </div>
+
+        <!-- Feedback Overlay (Correct/Incorrect) -->
+        <div id="feedback" class="hidden fixed inset-0 flex items-center justify-center z-50 bg-black/20 pointer-events-none">
+            <div id="feedback-content" class="bg-white p-6 rounded-2xl shadow-2xl text-center scale-90 opacity-0 transition-all duration-300 transform">
+                <i id="feedback-icon" class="text-6xl mb-4"></i>
+                <h3 id="feedback-title" class="text-2xl font-bold mb-2"></h3>
+                <p id="feedback-rationale" class="text-gray-600 text-sm max-w-sm"></p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-screen" class="hidden text-center py-10 fade-in">
+            <i class="fas fa-graduation-cap text-7xl text-teal-600 mb-6"></i>
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">クイズ終了！</h2>
+            <p class="text-gray-600 mb-8">お疲れ様でした。あなたの実力は...</p>
+            <div class="text-6xl font-black text-teal-600 mb-10">
+                <span id="final-score">0</span><span class="text-2xl text-gray-400"> / 100</span>
+            </div>
+            <div id="rank-display" class="mb-10 text-xl font-bold text-teal-700"></div>
+            <button onclick="location.reload()" class="bg-teal-600 hover:bg-teal-700 text-white px-10 py-4 rounded-full font-bold shadow-lg transition-all active:scale-95">
+                もう一度挑戦する
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const quizData = {
+            "questions": [
+                {
+                    "question": "古文における助動詞「き」の用法として正しいものはどれですか。",
+                    "options": ["経験した過去を表す", "伝聞した過去を表す", "現在の推量を表す", "完了の状態を表す"],
+                    "correct": 0,
+                    "rationale": "助動詞「き」は、話し手や書き手が直接経験した過去の事実に使われます。",
+                    "hint": "「せ・○・き・し・しか・○」と活用する、直接経験の助動詞です。"
+                },
+                {
+                    "question": "数学の二次関数 y = ax^2 + bx + c において、グラフが常に x 軸より上側にあるための条件はどれですか。",
+                    "options": ["a > 0 かつ D < 0", "a > 0 かつ D > 0", "a < 0 かつ D < 0", "a < 0 かつ D = 0"],
+                    "correct": 0,
+                    "rationale": "下に凸（a > 0）であり、かつ x 軸との共有点を持たない（判別式 D < 0）ときに常に上側に位置します。",
+                    "hint": "グラフの向き（凸）と、判別式 D（共有点の数）の関係を考えましょう。"
+                },
+                {
+                    "question": "1648年に締結され「主権国家体制」の出発点となった条約は何ですか。",
+                    "options": ["ウェストファリア条約", "ベルサイユ条約", "ユトレヒト条約", "ウィーン議定書"],
+                    "correct": 0,
+                    "rationale": "三十年戦争の終結のために結ばれた条約で、近代的な主権国家の概念を確立しました。",
+                    "hint": "ドイツ（神聖ローマ帝国）国内の宗教戦争に終止符を打った条約です。"
+                },
+                {
+                    "question": "英語で「〜したほうがよい」という強い忠告を表す際、最も適切な表現はどれですか。",
+                    "options": ["had better", "would like to", "used to", "look forward to"],
+                    "correct": 0,
+                    "rationale": "「had better」は「そうしないと悪い結果を招く」というニュアンスを含む強い忠告です。",
+                    "hint": "目上の人に使うと失礼になることもある、かなり強制力の強い助動詞句です。"
+                },
+                {
+                    "question": "植物細胞にのみ存在し、光合成を行う細胞小器官はどれですか。",
+                    "options": ["葉緑体", "ミトコンドリア", "リボソーム", "中心体"],
+                    "correct": 0,
+                    "rationale": "葉緑体はクロロフィルを含み、光エネルギーを化学エネルギーに変換します。",
+                    "hint": "太陽の光を浴びて栄養分を作る「緑色」のアレです。"
+                },
+                {
+                    "question": "不対電子を持ち、共有結合に使われていない電子対のことを何と呼びますか。",
+                    "options": ["非共有電子対", "共有電子対", "価電子", "イオン結合"],
+                    "correct": 0,
+                    "rationale": "原子の最外殻にある電子のうち、結合に関与していない電子対のことです。",
+                    "hint": "アンモニア（NH3）の窒素原子の上に残っている1対の電子などがこれにあたります。"
+                },
+                {
+                    "question": "自分自身のことを対象として意識することを何と言いますか。",
+                    "options": ["自己対象化", "アイデンティティ", "パラダイムシフト", "形而上学"],
+                    "correct": 0,
+                    "rationale": "自分を主観から切り離し、あたかも他人のように客観的に見つめることです。",
+                    "hint": "自分を「物」のように外側から観察するイメージです。"
+                },
+                {
+                    "question": "力の大きさ（F）と加速度（a）、質量（m）の関係を表す「運動方程式」はどれですか。",
+                    "options": ["ma = F", "v = v0 + at", "E = mc^2", "P = IV"],
+                    "correct": 0,
+                    "rationale": "運動の第2法則。物体にかかる力は、質量と加速度の積に等しいという基本式です。",
+                    "hint": "ニュートン力学の最も有名な式です。"
+                },
+                {
+                    "question": "赤道付近で上昇気流が発生し、緯度30度付近で下降気流となって生じる循環を何と呼びますか。",
+                    "options": ["ハドレー循環", "フェレル循環", "極循環", "偏西風"],
+                    "correct": 0,
+                    "rationale": "低緯度の熱輸送を担う大気循環で、亜熱帯高圧帯を形成する原因となります。",
+                    "hint": "熱帯収束帯と亜熱帯高圧帯を結ぶ大きな空気の動きです。"
+                },
+                {
+                    "question": "日本銀行が市場の通貨量を調整するために行う主要な政策は何ですか。",
+                    "options": ["公開市場操作", "累進課税", "公共投資", "為替介入"],
+                    "correct": 0,
+                    "rationale": "日銀が民間金融機関と国債などを売買することで、通貨量を調整します。",
+                    "hint": "中央銀行が行う「金融政策」の代表格です。"
+                }
+            ]
+        };
+
+        let currentQuestion = 0;
+        let score = 0;
+        let canAnswer = true;
+
+        // DOM Elements
+        const questionText = document.getElementById('question-text');
+        const optionsGrid = document.getElementById('options-grid');
+        const currentNum = document.getElementById('current-question-num');
+        const scoreDisplay = document.getElementById('score-display');
+        const progressBar = document.getElementById('progress-bar');
+        const hintBox = document.getElementById('hint-box');
+        const hintToggle = document.getElementById('hint-toggle');
+        const hintText = document.getElementById('hint-text');
+        const feedback = document.getElementById('feedback');
+        const feedbackContent = document.getElementById('feedback-content');
+        const feedbackIcon = document.getElementById('feedback-icon');
+        const feedbackTitle = document.getElementById('feedback-title');
+        const feedbackRationale = document.getElementById('feedback-rationale');
+
+        function loadQuestion() {
+            canAnswer = true;
+            const q = quizData.questions[currentQuestion];
+            
+            // Header
+            currentNum.textContent = `第 ${currentQuestion + 1} 問 / ${quizData.questions.length}`;
+            progressBar.style.width = `${((currentQuestion + 1) / quizData.questions.length) * 100}%`;
+            
+            // Question text
+            questionText.textContent = q.question;
+            
+            // Options
+            optionsGrid.innerHTML = '';
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-4 md:p-5 rounded-2xl border-2 border-gray-100 hover:border-teal-400 hover:bg-teal-50 transition-all font-medium text-gray-700 flex items-center justify-between group";
+                btn.innerHTML = `
+                    <span>${opt}</span>
+                    <i class="fas fa-chevron-right text-gray-300 group-hover:text-teal-400 transition-colors"></i>
+                `;
+                btn.onclick = () => selectOption(index);
+                optionsGrid.appendChild(btn);
+            });
+
+            // Hint Reset
+            hintBox.classList.remove('hidden');
+            hintText.classList.add('hidden');
+            hintText.textContent = q.hint;
+            hintToggle.onclick = () => hintText.classList.toggle('hidden');
+        }
+
+        function selectOption(index) {
+            if (!canAnswer) return;
+            canAnswer = false;
+
+            const q = quizData.questions[currentQuestion];
+            const isCorrect = index === q.correct;
+
+            if (isCorrect) {
+                score += 10;
+                showFeedback(true, q.rationale);
+            } else {
+                showFeedback(false, q.rationale);
+            }
+
+            scoreDisplay.textContent = `スコア: ${score}`;
+        }
+
+        function showFeedback(isCorrect, rationale) {
+            feedback.classList.remove('hidden');
+            feedbackIcon.className = isCorrect ? "fas fa-check-circle text-green-500 text-6xl mb-4" : "fas fa-times-circle text-red-500 text-6xl mb-4";
+            feedbackTitle.textContent = isCorrect ? "正解！" : "残念...";
+            feedbackTitle.className = `text-2xl font-bold mb-2 ${isCorrect ? 'text-green-600' : 'text-red-600'}`;
+            feedbackRationale.textContent = rationale;
+
+            // Animate in
+            setTimeout(() => {
+                feedbackContent.classList.remove('scale-90', 'opacity-0');
+                feedbackContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            // Move to next after 2.5s
+            setTimeout(() => {
+                feedbackContent.classList.add('scale-90', 'opacity-0');
+                feedbackContent.classList.remove('scale-100', 'opacity-100');
+                
+                setTimeout(() => {
+                    feedback.classList.add('hidden');
+                    nextQuestion();
+                }, 300);
+            }, 2500);
+        }
+
+        function nextQuestion() {
+            currentQuestion++;
+            if (currentQuestion < quizData.questions.length) {
+                const container = document.getElementById('question-container');
+                container.classList.remove('fade-in');
+                void container.offsetWidth; // Trigger reflow
+                container.classList.add('fade-in');
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            document.getElementById('quiz-header').classList.add('hidden');
+            document.getElementById('question-container').classList.add('hidden');
+            const results = document.getElementById('results-screen');
+            results.classList.remove('hidden');
+            
+            document.getElementById('final-score').textContent = score;
+            
+            let rank = "";
+            if (score === 100) rank = "完璧！まさに秀才です！";
+            else if (score >= 80) rank = "素晴らしい！難関大レベルです！";
+            else if (score >= 60) rank = "合格点！基礎がしっかりしています。";
+            else if (score >= 40) rank = "もう少し！復習してみましょう。";
+            else rank = "伸び代がたくさん！頑張りましょう。";
+            
+            document.getElementById('rank-display').textContent = rank;
+        }
+
+        // Start
+        loadQuestion();
+    </script>
+</body>
+</html>"

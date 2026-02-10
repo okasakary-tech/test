@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palette Magic - 配色パレットメーカー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            min-height: screen;
+        }
+
+        .color-card {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .color-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .animate-pop {
+            animation: pop 0.4s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.95); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-2">
+                <i class="fas fa-palette text-pink-500 mr-2"></i>Palette Magic
+            </h1>
+            <p class="text-slate-600">お気に入りの色を見つけて、クリエイティブを広げよう！</p>
+        </header>
+
+        <!-- Main Palette Display -->
+        <div id="paletteContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <!-- Colors will be injected here -->
+            <div class="h-64 bg-slate-200 animate-pulse rounded-2xl"></div>
+            <div class="h-64 bg-slate-200 animate-pulse rounded-2xl"></div>
+            <div class="h-64 bg-slate-200 animate-pulse rounded-2xl"></div>
+            <div class="h-64 bg-slate-200 animate-pulse rounded-2xl"></div>
+            <div class="h-64 bg-slate-200 animate-pulse rounded-2xl"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col items-center gap-6 mb-12">
+            <button onclick="generateNewPalette()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold py-4 px-12 rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2">
+                <i class="fas fa-sync-alt" id="syncIcon"></i> 新しいパレットを作る
+            </button>
+            <p class="text-sm text-slate-500">スペースキーを押しても生成できるよ！</p>
+        </div>
+
+        <!-- AI Insight Section -->
+        <div id="aiSection" class="glass rounded-3xl p-6 md:p-8 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-amber-100 p-2 rounded-lg text-amber-600">
+                    <i class="fas fa-lightbulb"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-800">AIのおすすめイメージ</h2>
+            </div>
+            <div id="aiDescription" class="text-slate-700 leading-relaxed italic">
+                「新しいパレットを作る」ボタンを押すと、この配色の使い道や雰囲気をAIが教えてくれます。
+            </div>
+            <div id="loadingAi" class="hidden flex items-center gap-2 text-indigo-500 mt-2">
+                <i class="fas fa-circle-notch fa-spin"></i> AIが考え中...
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-slate-400 text-sm">
+            <p>&copy; 2026 Palette Magic - 楽しくて安全なデザインツール</p>
+        </footer>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl transition-opacity opacity-0 pointer-events-none">
+        コピーしました！
+    </div>
+
+    <script>
+        const apiKey = ""; // API key will be injected
+        let currentPalette = [];
+
+        // 初期生成
+        window.onload = () => {
+            generateNewPalette();
+        };
+
+        // スペースキーで生成
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                generateNewPalette();
+            }
+        });
+
+        function generateNewPalette() {
+            currentPalette = [];
+            const container = document.getElementById('paletteContainer');
+            container.innerHTML = '';
+
+            // 5色のランダムな色を生成（明るめで使いやすい色を優先）
+            for (let i = 0; i < 5; i++) {
+                const color = generateRandomColor();
+                currentPalette.push(color);
+                
+                const card = document.createElement('div');
+                card.className = 'color-card glass rounded-2xl overflow-hidden shadow-md animate-pop';
+                card.style.animationDelay = `${i * 0.05}s`;
+                
+                card.innerHTML = `
+                    <div class="h-48 w-full cursor-pointer" style="background-color: ${color}" onclick="copyColor('${color}')"></div>
+                    <div class="p-4 flex flex-col items-center">
+                        <span class="font-bold text-slate-700 mb-2 uppercase tracking-wider">${color}</span>
+                        <button onclick="copyColor('${color}')" class="text-slate-400 hover:text-indigo-500 transition-colors">
+                            <i class="far fa-copy"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+            
+            askAIForMeaning();
+        }
+
+        function generateRandomColor() {
+            // パステル〜鮮やかな色が出やすいように調整
+            const h = Math.floor(Math.random() * 360);
+            const s = Math.floor(Math.random() * 30) + 60; // 60-90%
+            const l = Math.floor(Math.random() * 20) + 60; // 60-80%
+            return hslToHex(h, s, l);
+        }
+
+        async function askAIForMeaning() {
+            const aiDesc = document.getElementById('aiDescription');
+            const loader = document.getElementById('loadingAi');
+            
+            aiDesc.classList.add('opacity-50');
+            loader.classList.remove('hidden');
+
+            const systemPrompt = "あなたは色彩心理学に詳しい親切なデザインアシスタントです。入力されたカラーコードの組み合わせを見て、その配色がどのようなポジティブなイメージ（例：春のピクニック、夢の中の冒険、清潔なオフィスなど）を与えるか、100文字程度で優しく解説してください。未成年にふさわしくない表現は避けてください。";
+            const userQuery = `配色リスト: ${currentPalette.join(', ')}`;
+
+            try {
+                const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (text) {
+                    aiDesc.innerText = text.trim();
+                }
+            } catch (error) {
+                aiDesc.innerText = "今回の配色のイメージ：穏やかで素敵な組み合わせです。あなたの感性で自由に名前をつけてみてくださいね！";
+                console.error("AI Error:", error);
+            } finally {
+                aiDesc.classList.remove('opacity-50');
+                loader.classList.add('hidden');
+            }
+        }
+
+        async function fetchWithRetry(url, options, retries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) return response;
+                } catch (e) {}
+                await new Promise(res => setTimeout(res, delay));
+                delay *= 2;
+            }
+            throw new Error('API failed');
+        }
+
+        function copyColor(hex) {
+            const el = document.createElement('textarea');
+            el.value = hex;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+
+            const toast = document.getElementById('toast');
+            toast.innerText = `${hex} をコピーしたよ！`;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2000);
+        }
+
+        // Helper: HSL to HEX
+        function hslToHex(h, s, l) {
+            l /= 100;
+            const a = s * Math.min(l, 1 - l) / 100;
+            const f = n => {
+                const k = (n + h / 30) % 12;
+                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                return Math.round(255 * color).toString(16).padStart(2, '0');
+            };
+            return `#${f(0)}${f(8)}${f(4)}`;
+        }
+    </script>
+</body>
+</html>

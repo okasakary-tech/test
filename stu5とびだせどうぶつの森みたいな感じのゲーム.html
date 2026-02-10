@@ -1,0 +1,525 @@
+"<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>森の村長さん - のんびりスローライフ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap');
+
+        :root {
+            --grass: #78e08f;
+            --river: #54a0ff;
+            --ui-bg: #fff9e6;
+            --ui-border: #d4a373;
+            --pavement: #d1d8e0;
+        }
+
+        body {
+            font-family: 'Kiwi Maru', serif;
+            background-color: #f0fdf4;
+            margin: 0;
+            overflow: hidden;
+            color: #5d4037;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #village-map {
+            flex-grow: 1;
+            background-color: var(--grass);
+            background-image: radial-gradient(#63d07a 2px, transparent 2px);
+            background-size: 60px 60px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 川の描画 */
+        .river {
+            position: absolute;
+            background-color: var(--river);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            z-index: 2;
+        }
+
+        /* 橋 */
+        .bridge {
+            position: absolute;
+            background-color: #e67e22;
+            border: 4px solid #d35400;
+            border-radius: 4px;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .pavement-area {
+            position: absolute;
+            background-color: var(--pavement);
+            border: 4px solid #a5b1c2;
+            border-radius: 20px;
+            z-index: 1;
+        }
+
+        /* 立体的なキャラクター */
+        .character-sprite {
+            filter: drop-shadow(0 8px 4px rgba(0,0,0,0.3));
+            animation: bounce 0.6s infinite alternate ease-in-out;
+        }
+
+        #player {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            font-size: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: left 0.4s ease-out, top 0.4s ease-out;
+            pointer-events: none;
+        }
+
+        .entity {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        .entity:hover { transform: scale(1.1); cursor: pointer; }
+
+        .building { z-index: 10; }
+        .plant { z-index: 5; font-size: 3.5rem; }
+        .villager { z-index: 20; transition: left 1.5s ease-in-out, top 1.5s ease-in-out; }
+
+        .fruit-on-tree {
+            position: absolute;
+            font-size: 1.2rem;
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        .label {
+            background: white;
+            padding: 1px 8px;
+            border-radius: 12px;
+            border: 2px solid var(--ui-border);
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-top: -5px;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .exclamation {
+            position: absolute;
+            top: -40px;
+            font-size: 1.5rem;
+            color: #e74c3c;
+            font-weight: bold;
+            animation: bounceEx 0.5s infinite;
+            background: white;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #e74c3c;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-8px); }
+        }
+
+        @keyframes bounceEx {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* UI Styles */
+        .fancy-panel {
+            background: var(--ui-bg);
+            border: 4px solid var(--ui-border);
+            border-radius: 20px;
+            box-shadow: 0 6px 0px #bc8a5f;
+        }
+
+        .resource-card {
+            background: white;
+            border: 2px solid #e9edc9;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #dialogue-box {
+            position: absolute;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 600px;
+            background: white;
+            border: 5px solid var(--ui-border);
+            border-radius: 20px;
+            padding: 20px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .dropped-item {
+            position: absolute;
+            font-size: 1.5rem;
+            z-index: 4;
+            cursor: pointer;
+            filter: drop-shadow(0 4px 2px rgba(0,0,0,0.2));
+            animation: pop 0.4s ease-out;
+        }
+        @keyframes pop {
+            0% { transform: scale(0) translateY(0); }
+            50% { transform: scale(1.2) translateY(-20px); }
+            100% { transform: scale(1) translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="p-4 flex flex-wrap justify-between items-center bg-green-100 border-b-4 border-green-200 z-50">
+        <div class="flex flex-wrap gap-3">
+            <div class="resource-card">💰 <span id="res-coin">500</span></div>
+            <div class="resource-card">🎒 持ち物: <span id="res-inv">0</span>/10</div>
+        </div>
+        <div class="bg-white px-6 py-2 rounded-full border-4 border-orange-300 font-bold text-orange-800 shadow-sm">
+            🌳 <span id="village-name">コモレビ村</span>
+        </div>
+    </div>
+
+    <div id="village-map" onclick="movePlayer(event)">
+        <!-- 川の設置 -->
+        <div class="river" style="left: 0; top: 45%; width: 100%; height: 80px;"></div>
+        <!-- 橋 -->
+        <div class="bridge" style="left: 45%; top: 44%; width: 120px; height: 100px;">はし</div>
+        
+        <!-- 駅裏商店街エリアの舗装 -->
+        <div class="pavement-area" style="left: 0; top: 0; width: 100%; height: 180px;"></div>
+        
+        <div id="player" class="character-sprite">🧑‍🌾</div>
+    </div>
+
+    <div id="dialogue-box">
+        <div id="dialogue-name" class="font-bold text-orange-700 mb-2"></div>
+        <div id="dialogue-text" class="text-lg"></div>
+        <button onclick="closeDialogue()" class="mt-4 bg-orange-400 text-white px-4 py-1 rounded-full font-bold hover:bg-orange-500 shadow">とじる</button>
+    </div>
+
+    <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 bg-green-50 z-50">
+        <div class="col-span-1 md:col-span-2 fancy-panel p-4">
+            <h3 class="text-sm font-bold text-orange-700 mb-2">🏗️ 公共事業</h3>
+            <div class="flex gap-4 overflow-x-auto pb-1" id="build-menu"></div>
+        </div>
+        <div class="col-span-1 fancy-panel p-4">
+            <h3 class="text-sm font-bold text-blue-700 mb-1">📝 村長ガイド</h3>
+            <div class="text-xs text-gray-600 leading-tight">
+                ・駅の向こう側が商店街エリアです！<br>
+                ・川の向こうへは橋を渡っていけます<br>
+                ・住人の「！」が出たらチャンス！
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const VILLAGERS = [
+        { name: "たぬきち", emoji: "🦊", quotes: ["新しい家を建てるなら、ボクに相談してね！", "商店街も賑わってきただなも！"], alert: "あ！村長さん！駅の向こうに新しい店を作っておいただなも！" },
+        { name: "しずえ", emoji: "🐶", quotes: ["村のお仕事、いつでもお手伝いしますよ！", "川のせせらぎが心地よいですね。"], alert: "村長さん！川に橋をかけました。移動が楽になりますよ！" },
+        { name: "パッチ", emoji: "🐻", quotes: ["おなかすいたな〜。なにか食べ物ない？", "橋の上でお昼寝するの大好きなんだぁ。"], alert: "ねえねえ、村長さん！美味しいフルーツ拾った？" },
+        { name: "きぬよ", emoji: "🦔", quotes: ["ウチの店で、最高の服を仕立てるわよ！", "商店街で待ってるわね。"], alert: "村長さん！エイブルシスターズに新作が入ったんや！" }
+    ];
+
+    const TREE_TYPES = ["🌲", "🌳", "🍎", "🍐", "💰_TREE"];
+    const BUILDING_TYPES = [
+        { id: 'house', name: '住人の家', icon: '🏠', cost: 500 },
+        { id: 'flower', name: '花壇', icon: '🌻', cost: 150 }
+    ];
+
+    let state = {
+        pos: { x: window.innerWidth/2, y: window.innerHeight - 200 },
+        coins: 1000,
+        inventory: [],
+        villagers: [],
+        plants: [],
+        selectedBuildId: null,
+        isDialogueOpen: false
+    };
+
+    const mapEl = document.getElementById('village-map');
+    const playerEl = document.getElementById('player');
+    const invEl = document.getElementById('res-inv');
+    const coinEl = document.getElementById('res-coin');
+
+    function init() {
+        setupTownArea(); // 駅の向こう
+        setupStaticBuildings(); // 村の中
+        setupNature(25);
+        setupVillagers();
+        renderBuildMenu();
+        updatePlayerPos();
+        
+        setInterval(villagerTick, 4000);
+        setInterval(natureTick, 20000);
+    }
+
+    // 駅の向こう側の商店街
+    function setupTownArea() {
+        // まめつぶ商店
+        createEntity('building', 'まめつぶ商店', '🏪', 150, 40, () => showDialogue("まめきち", "いらっしゃいませ！掘り出し物があるかもです！"));
+        // 駅
+        createEntity('building', '村の駅', '🚉', 450, 40, () => showDialogue("駅員", "今日も良い旅を！"));
+        // エイブルシスターズ
+        createEntity('building', 'エイブルシスターズ', '👗', 750, 40, () => showDialogue("きぬよ", "自慢の一着、見ていきな！"));
+        // タヌキハウジング
+        createEntity('building', 'タヌキハウジング', '🏘️', 1050, 40, () => showDialogue("たぬきち", "マイホームの夢、叶えるだなも！"));
+    }
+
+    function setupStaticBuildings() {
+        const midX = window.innerWidth / 2;
+        // 役場（川の手前）
+        createEntity('building', '役場', '🏛️', midX - 200, window.innerHeight - 350, () => showDialogue("しずえ", "村の行政はお任せください！"));
+        // R・パーカーズ
+        createEntity('building', 'R・パーカーズ', '♻️', midX + 200, window.innerHeight - 350, sellItems);
+    }
+
+    function setupNature(count) {
+        for(let i=0; i<count; i++) {
+            const x = Math.random() * (window.innerWidth - 100) + 50;
+            const y = Math.random() * (window.innerHeight - 450) + 400; // 下の方に配置
+            if (y > window.innerHeight * 0.4 && y < window.innerHeight * 0.55) continue; // 川を避ける
+
+            const type = TREE_TYPES[Math.floor(Math.random() * TREE_TYPES.length)];
+            const treeId = `tree-${Date.now()}-${i}`;
+            const treeEl = createEntity('plant', '', type === "💰_TREE" ? "🌲" : type, x, y, () => shakeTree(treeId));
+            
+            const treeData = { id: treeId, el: treeEl, type: type, x: x, y: y, fruitCount: (type === "🍎" || type === "🍐") ? 3 : 0, hasBell: type === "💰_TREE", fruitEls: [] };
+            state.plants.push(treeData);
+            updateTreeVisuals(treeData);
+        }
+    }
+
+    function updateTreeVisuals(tree) {
+        tree.fruitEls.forEach(el => el.remove());
+        tree.fruitEls = [];
+        if (tree.fruitCount > 0) {
+            const positions = [{t: '10px', l: '5px'}, {t: '15px', r: '5px'}, {t: '35px', l: '15px'}];
+            for (let i = 0; i < tree.fruitCount; i++) {
+                const f = document.createElement('div');
+                f.className = 'fruit-on-tree';
+                f.innerText = tree.type;
+                f.style.top = positions[i].t;
+                if (positions[i].l) f.style.left = positions[i].l;
+                if (positions[i].r) f.style.right = positions[i].r;
+                tree.el.appendChild(f);
+                tree.fruitEls.push(f);
+            }
+        }
+    }
+
+    function setupVillagers() {
+        VILLAGERS.forEach((v, i) => {
+            const x = 200 + (i * 250);
+            const y = window.innerHeight - 250;
+            const vData = { ...v, x, y, hasAlert: false };
+            const el = createEntity('villager', v.name, v.emoji, x, y, () => talkToVillager(vData));
+            el.querySelector('.icon').classList.add('character-sprite');
+            vData.el = el;
+            state.villagers.push(vData);
+        });
+    }
+
+    function createEntity(type, name, icon, x, y, onClick) {
+        const div = document.createElement('div');
+        div.className = `entity ${type}`;
+        div.style.left = `${x}px`;
+        div.style.top = `${y}px`;
+        div.innerHTML = `<div class="icon">${icon}</div>${name ? `<div class="label">${name}</div>` : ''}`;
+        div.onclick = (e) => {
+            e.stopPropagation();
+            if (state.selectedBuildId) {
+                placeBuilding(e);
+            } else {
+                const dist = Math.hypot(state.pos.x - x, state.pos.y - y);
+                if (dist < 180) onClick(div);
+                else movePlayer(e);
+            }
+        };
+        mapEl.appendChild(div);
+        return div;
+    }
+
+    function movePlayer(e) {
+        if (state.isDialogueOpen) return;
+        state.pos.x = e.clientX - 25;
+        state.pos.y = e.clientY - 25;
+        updatePlayerPos();
+    }
+
+    function updatePlayerPos() {
+        playerEl.style.left = `${state.pos.x}px`;
+        playerEl.style.top = `${state.pos.y}px`;
+    }
+
+    function shakeTree(treeId) {
+        const tree = state.plants.find(t => t.id === treeId);
+        if (!tree) return;
+        tree.el.style.transform = "rotate(10deg)";
+        setTimeout(() => tree.el.style.transform = "rotate(-10deg)", 100);
+        setTimeout(() => tree.el.style.transform = "rotate(0deg)", 200);
+
+        if (tree.fruitCount > 0) {
+            for (let i = 0; i < tree.fruitCount; i++) dropItem(tree.type, tree.x + (Math.random()-0.5)*70, tree.y + 70 + i*15);
+            tree.fruitCount = 0;
+            updateTreeVisuals(tree);
+        } else if (tree.hasBell) {
+            dropItem("💰", tree.x + 20, tree.y + 70);
+            tree.hasBell = false;
+        } else if (Math.random() > 0.7) {
+            dropItem("🪵", tree.x + 20, tree.y + 70);
+        }
+    }
+
+    function dropItem(type, x, y) {
+        const item = document.createElement('div');
+        item.className = 'dropped-item';
+        item.innerText = type;
+        item.style.left = `${x}px`;
+        item.style.top = `${y}px`;
+        item.onclick = (e) => {
+            e.stopPropagation();
+            if (state.inventory.length >= 10) return;
+            if (type === "💰") state.coins += 100;
+            else state.inventory.push(type);
+            item.remove();
+            updateUI();
+        };
+        mapEl.appendChild(item);
+        setTimeout(() => { if(item.parentNode) item.remove(); }, 30000);
+    }
+
+    function sellItems() {
+        if (state.inventory.length === 0) {
+            showDialogue("リサ", "いらっしゃい！何か売りたい物はあるかしら？");
+            return;
+        }
+        let total = state.inventory.reduce((sum, item) => sum + (item === "🪵" ? 10 : 100), 0);
+        state.coins += total;
+        state.inventory = [];
+        showDialogue("リサ", `${total} ベルで買い取らせてもらったわ！ありがとう！`);
+        updateUI();
+    }
+
+    function talkToVillager(v) {
+        let msg = v.hasAlert ? v.alert : v.quotes[Math.floor(Math.random() * v.quotes.length)];
+        if (v.hasAlert) {
+            v.hasAlert = false;
+            const ex = v.el.querySelector('.exclamation');
+            if (ex) ex.remove();
+        }
+        showDialogue(v.name, msg);
+    }
+
+    function villagerTick() {
+        state.villagers.forEach(v => {
+            if (Math.random() > 0.5) {
+                const dx = (Math.random() - 0.5) * 120;
+                const dy = (Math.random() - 0.5) * 120;
+                // 川に落ちないように制限
+                if (v.y + dy < window.innerHeight * 0.4 || v.y + dy > window.innerHeight * 0.55) {
+                    v.x += dx; v.y += dy;
+                    v.el.style.left = `${v.x}px`;
+                    v.el.style.top = `${v.y}px`;
+                }
+            }
+            if (!v.hasAlert && Math.random() > 0.95) {
+                v.hasAlert = true;
+                const ex = document.createElement('div');
+                ex.className = "exclamation"; ex.innerText = "!";
+                v.el.appendChild(ex);
+            }
+        });
+    }
+
+    function natureTick() {
+        state.plants.forEach(tree => {
+            if ((tree.type === "🍎" || tree.type === "🍐") && tree.fruitCount === 0 && Math.random() > 0.6) {
+                tree.fruitCount = 3; updateTreeVisuals(tree);
+            }
+            if (tree.type === "💰_TREE" && !tree.hasBell && Math.random() > 0.8) tree.hasBell = true;
+        });
+    }
+
+    function showDialogue(name, text) {
+        state.isDialogueOpen = true;
+        document.getElementById('dialogue-name').innerText = name;
+        document.getElementById('dialogue-text').innerText = text;
+        document.getElementById('dialogue-box').style.display = 'block';
+    }
+
+    function closeDialogue() {
+        state.isDialogueOpen = false;
+        document.getElementById('dialogue-box').style.display = 'none';
+    }
+
+    function updateUI() {
+        coinEl.innerText = state.coins;
+        invEl.innerText = state.inventory.length;
+    }
+
+    function renderBuildMenu() {
+        const menu = document.getElementById('build-menu');
+        BUILDING_TYPES.forEach(b => {
+            const btn = document.createElement('button');
+            btn.className = "bg-white p-2 rounded-lg border-2 border-orange-200 min-w-[95px] hover:bg-orange-50 transition shadow-sm";
+            btn.innerHTML = `<div class="text-2xl">${b.icon}</div><div class="text-[10px] font-bold">💰${b.cost}</div><div class="text-[9px] text-gray-500">${b.name}</div>`;
+            btn.onclick = (e) => { e.stopPropagation(); state.selectedBuildId = b.id; };
+            menu.appendChild(btn);
+        });
+    }
+
+    function placeBuilding(e) {
+        const bData = BUILDING_TYPES.find(b => b.id === state.selectedBuildId);
+        if (state.coins < bData.cost) {
+            showDialogue("しずえ", "ベルが足りないようです…");
+        } else {
+            state.coins -= bData.cost;
+            createEntity('building', bData.name, bData.icon, e.clientX - 40, e.clientY - 40, () => {});
+            updateUI();
+        }
+        state.selectedBuildId = null;
+    }
+
+    window.onload = init;
+</script>
+
+</body>
+</html>"

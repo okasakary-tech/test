@@ -1,0 +1,301 @@
+"<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mouth Catcher - Yummy!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            touch-action: none;
+            overflow: hidden;
+            background: #ffc1cc; /* Soft pink */
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 600px;
+            margin: 0 auto;
+            background: linear-gradient(to bottom, #ff9a9e 0%, #fecfef 100%);
+            overflow: hidden;
+            border-left: 1px solid rgba(255,255,255,0.3);
+            border-right: 1px solid rgba(255,255,255,0.3);
+        }
+        /* Inside the Mouth Background */
+        .mouth-bg {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        /* Top Teeth */
+        .teeth-top {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            font-size: 2.5rem;
+            opacity: 0.8;
+            filter: drop-shadow(0 4px 2px rgba(0,0,0,0.1));
+        }
+        /* Tongue / Ground */
+        .tongue {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120%;
+            height: 150px;
+            background: #ff4d6d;
+            border-radius: 50% 50% 0 0;
+            z-index: 5;
+            box-shadow: inset 0 20px 30px rgba(0,0,0,0.1);
+        }
+
+        .item {
+            position: absolute;
+            font-size: 2.5rem;
+            user-select: none;
+            will-change: transform;
+            z-index: 20;
+        }
+        #player {
+            position: absolute;
+            bottom: 60px;
+            width: 100px;
+            height: 80px;
+            font-size: 5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s ease-out;
+            cursor: grab;
+            user-select: none;
+            z-index: 30;
+        }
+        .score-float {
+            position: absolute;
+            color: #d81b60;
+            font-weight: bold;
+            z-index: 40;
+            animation: floatUp 0.5s ease-out forwards;
+        }
+        @keyframes floatUp {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-40px); }
+        }
+        #overlay {
+            background: rgba(89, 13, 34, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="font-sans text-slate-800">
+
+    <div id="game-container">
+        <!-- Inside Mouth Visuals -->
+        <div class="mouth-bg">
+            <div class="teeth-top">
+                <span>🦷</span><span>🦷</span><span>🦷</span><span>🦷</span><span>🦷</span><span>🦷</span>
+            </div>
+        </div>
+
+        <!-- Score Display -->
+        <div class="absolute top-16 left-0 right-0 text-center z-50 pointer-events-none">
+            <div class="inline-block bg-white/90 px-6 py-2 rounded-full shadow-lg border border-pink-100">
+                <span class="text-pink-600 text-sm font-bold uppercase tracking-wider">Munch Count</span>
+                <div id="score" class="text-3xl font-black text-pink-800">0</div>
+            </div>
+        </div>
+
+        <!-- Tongue -->
+        <div class="tongue"></div>
+
+        <!-- Player (Mouth) -->
+        <div id="player">👄</div>
+
+        <!-- Overlay -->
+        <div id="overlay" class="absolute inset-0 flex items-center justify-center p-6">
+            <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center border-4 border-pink-200">
+                <div id="status-icon" class="text-7xl mb-4">😋</div>
+                <h2 id="status-title" class="text-3xl font-black mb-2 text-pink-700">Mouth Catcher</h2>
+                <p id="status-desc" class="text-slate-500 mb-8 leading-relaxed">
+                    落ちてくる食べ物を大きな口で食べよう！<br>
+                    <span class="text-red-500 font-bold italic">食べ残しは厳禁！<br>地面に落としたら終了です。</span>
+                </p>
+                <button id="start-btn" class="w-full bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold text-xl transition-all active:scale-95 shadow-lg">
+                    いただきます！
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const foods = ['🍎', '🍕', '🍔', '🍟', '🍣', '🍩', '🍪', '🍦', '🍙', '🍇', '🍌', '🍰', '🥐', '🍗', '🍜', '🍱', '🥞'];
+        
+        const container = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const scoreElement = document.getElementById('score');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+        const statusIcon = document.getElementById('status-icon');
+        const statusTitle = document.getElementById('status-title');
+        const statusDesc = document.getElementById('status-desc');
+
+        let score = 0;
+        let gameActive = false;
+        let playerX = 0;
+        let items = [];
+        let spawnRate = 1500;
+        let baseSpeed = 2.5;
+        let lastSpawn = 0;
+        let animationFrameId;
+
+        function initPlayer() {
+            playerX = container.offsetWidth / 2 - player.offsetWidth / 2;
+            updatePlayerPosition();
+        }
+
+        function updatePlayerPosition() {
+            player.style.left = `${playerX}px`;
+        }
+
+        function handleMove(clientX) {
+            if (!gameActive) return;
+            const rect = container.getBoundingClientRect();
+            let x = clientX - rect.left - player.offsetWidth / 2;
+            
+            if (x < 0) x = 0;
+            if (x > container.offsetWidth - player.offsetWidth) x = container.offsetWidth - player.offsetWidth;
+            
+            playerX = x;
+            updatePlayerPosition();
+        }
+
+        window.addEventListener('mousemove', (e) => handleMove(e.clientX));
+        window.addEventListener('touchmove', (e) => {
+            handleMove(e.touches[0].clientX);
+            e.preventDefault();
+        }, { passive: false });
+
+        window.addEventListener('keydown', (e) => {
+            if (!gameActive) return;
+            const step = 40;
+            if (e.key === 'ArrowLeft') handleMove(playerX + player.offsetWidth / 2 - step + container.getBoundingClientRect().left);
+            if (e.key === 'ArrowRight') handleMove(playerX + player.offsetWidth / 2 + step + container.getBoundingClientRect().left);
+        });
+
+        function spawnItem() {
+            const emoji = foods[Math.floor(Math.random() * foods.length)];
+            const x = Math.random() * (container.offsetWidth - 50);
+            
+            const item = document.createElement('div');
+            item.className = 'item';
+            item.textContent = emoji;
+            item.style.left = `${x}px`;
+            item.style.top = `-60px`;
+            
+            container.appendChild(item);
+            
+            items.push({
+                element: item,
+                x: x,
+                y: -60,
+                speed: baseSpeed + (Math.random() * 2) + (score / 15)
+            });
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameActive) return;
+
+            if (timestamp - lastSpawn > spawnRate) {
+                spawnItem();
+                lastSpawn = timestamp;
+                spawnRate = Math.max(450, 1500 - (score * 25));
+            }
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                item.y += item.speed;
+                item.element.style.transform = `translateY(${item.y}px)`;
+
+                const playerRect = player.getBoundingClientRect();
+                const itemRect = item.element.getBoundingClientRect();
+
+                // Collision Check (Eating)
+                if (
+                    itemRect.bottom >= playerRect.top + 20 &&
+                    itemRect.top <= playerRect.bottom - 20 &&
+                    itemRect.right >= playerRect.left + 10 &&
+                    itemRect.left <= playerRect.right - 10
+                ) {
+                    score++;
+                    scoreElement.textContent = score;
+                    showEatEffect(item.x, item.y);
+                    
+                    // Visual feedback for eating
+                    player.textContent = '🤤';
+                    setTimeout(() => { if(gameActive) player.textContent = '👄'; }, 150);
+
+                    item.element.remove();
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                // Ground Check (Missed)
+                if (item.y > container.offsetHeight - 80) {
+                    gameOver();
+                    return;
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function showEatEffect(x, y) {
+            const effect = document.createElement('div');
+            effect.className = 'score-float';
+            effect.style.left = `${x}px`;
+            effect.style.top = `${y}px`;
+            effect.textContent = 'YUM!';
+            container.appendChild(effect);
+            setTimeout(() => effect.remove(), 500);
+        }
+
+        function startGame() {
+            score = 0;
+            scoreElement.textContent = '0';
+            items.forEach(item => item.element.remove());
+            items = [];
+            spawnRate = 1500;
+            gameActive = true;
+            player.textContent = '👄';
+            overlay.classList.add('hidden');
+            lastSpawn = performance.now();
+            initPlayer();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameActive = false;
+            cancelAnimationFrame(animationFrameId);
+            
+            player.textContent = '😵';
+            statusIcon.textContent = '🤢';
+            statusTitle.textContent = 'MESSY!';
+            statusDesc.innerHTML = `食べ物を落としてしまいました...<br><span class="text-2xl font-bold text-pink-700">食べた数: ${score}個</span>`;
+            startBtn.textContent = 'もういちど！';
+            overlay.classList.remove('hidden');
+        }
+
+        startBtn.addEventListener('click', startGame);
+        window.addEventListener('resize', initPlayer);
+        window.onload = initPlayer;
+    </script>
+</body>
+</html>"

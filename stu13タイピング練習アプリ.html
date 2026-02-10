@@ -1,0 +1,286 @@
+"<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Master - ローマ字練習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+            overflow: hidden; 
+        }
+
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        .word-display-kanji {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .word-display-roma {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: #6366f1;
+            background: #f1f5f9;
+            padding: 0.5rem 1.5rem;
+            border-radius: 1rem;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .pulse { animation: pulse 2s infinite; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="glass-morphism w-full max-w-2xl p-8 md:p-12 text-center">
+        <h1 class="text-3xl font-bold text-indigo-800 mb-8">Typing Master JP 🚀</h1>
+
+        <div class="grid grid-cols-2 gap-4 mb-10">
+            <div class="bg-blue-50 p-4 rounded-2xl">
+                <p class="text-sm text-blue-600 font-bold uppercase tracking-wider">残り時間</p>
+                <p id="timer" class="text-3xl font-bold text-blue-900">60s</p>
+            </div>
+            <div class="bg-emerald-50 p-4 rounded-2xl">
+                <p class="text-sm text-emerald-600 font-bold uppercase tracking-wider">スコア</p>
+                <p id="score" class="text-3xl font-bold text-emerald-900">0</p>
+            </div>
+        </div>
+
+        <div id="game-view" class="space-y-6">
+            <div id="word-display-area" class="min-h-[200px] flex flex-col justify-center items-center gap-6">
+                <div id="kanji-container" class="word-display-kanji">
+                    <span class="text-slate-400 text-xl">「Enter」で開始！</span>
+                </div>
+                <div id="roma-container" class="word-display-roma hidden"></div>
+            </div>
+
+            <input type="text" id="type-input" 
+                class="w-full text-2xl p-4 rounded-xl border-2 border-indigo-100 focus:border-indigo-500 focus:outline-none transition-all text-center disabled:bg-slate-50"
+                placeholder="ローマ字を入力..."
+                autocomplete="off"
+                disabled>
+
+            <div id="start-button-area">
+                <button id="start-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xl font-bold px-12 py-4 rounded-2xl shadow-lg transition-all transform hover:scale-105 active:scale-95 pulse">
+                    ゲームスタート！
+                </button>
+                <p class="text-slate-400 text-sm mt-4">Escキーでタイトルに戻る</p>
+            </div>
+        </div>
+
+        <div id="result-view" class="hidden space-y-6">
+            <h2 class="text-4xl font-bold text-indigo-900">タイムアップ！</h2>
+            <div class="py-8">
+                <p class="text-lg text-slate-600">1分間の正解数は...</p>
+                <p class="text-6xl font-black text-indigo-600 my-4"><span id="final-score">0</span> 回</p>
+                <p id="rank-message" class="text-xl font-bold text-slate-500"></p>
+            </div>
+            <div class="flex flex-col gap-4 items-center">
+                <button id="retry-btn" class="bg-slate-800 hover:bg-black text-white text-lg font-bold px-10 py-3 rounded-xl transition-all">
+                    もう一度挑戦する (Enter)
+                </button>
+                <button id="back-to-home-btn" class="text-indigo-600 font-medium hover:underline">
+                    タイトルに戻る (Esc)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wordList = [
+            { kanji: "太陽", roma: "taiyou" }, { kanji: "青空", roma: "aozora" }, { kanji: "未来", roma: "mirai" },
+            { kanji: "宇宙", roma: "utyuu" }, { kanji: "彗星", roma: "suisei" }, { kanji: "虹", roma: "niji" },
+            { kanji: "森林", roma: "sinrin" }, { kanji: "深海", roma: "sinkai" }, { kanji: "満月", roma: "mangetsu" },
+            { kanji: "白熊", roma: "sirokuma" }, { kanji: "麒麟", roma: "kirin" }, { kanji: "子犬", roma: "koinu" },
+            { kanji: "飛鳥", roma: "asuka" }, { kanji: "鯨", roma: "kujira" }, { kanji: "蜜蜂", roma: "mitsubati" },
+            { kanji: "林檎", roma: "ringo" }, { kanji: "牛乳", roma: "gyuunyuu" }, { kanji: "緑茶", roma: "ryokutya" },
+            { kanji: "朝食", roma: "tyousoku" }, { kanji: "苺", roma: "itigo" }, { kanji: "蜂蜜", roma: "hatimitsu" },
+            { kanji: "友達", roma: "tomodati" }, { kanji: "学校", roma: "gakkou" }, { kanji: "図書館", roma: "tosyokan" },
+            { kanji: "鉛筆", roma: "enpitsu" }, { kanji: "黒板", roma: "kokuban" }, { kanji: "宿題", roma: "syukudai" },
+            { kanji: "運動会", roma: "undoukai" }, { kanji: "放課後", roma: "houkago" }, { kanji: "制服", roma: "seifuku" },
+            { kanji: "希望", roma: "kibou" }, { kanji: "笑顔", roma: "egao" }, { kanji: "感謝", roma: "kansya" },
+            { kanji: "勇気", roma: "yuuki" }, { kanji: "平和", roma: "heiwa" }, { kanji: "努力", roma: "doryoku" },
+            { kanji: "感動", roma: "kandou" }, { kanji: "幸福", roma: "koufuku" }, { kanji: "尊敬", roma: "sonkei" },
+            { kanji: "冒険", roma: "bouken" }, { kanji: "秘密", roma: "himitsu" }, { kanji: "時計", roma: "tokei" },
+            { kanji: "地図", roma: "tizu" }, { kanji: "切手", roma: "kitte" }, { kanji: "電車", roma: "densya" },
+            { kanji: "自転車", roma: "zitensya" }, { kanji: "公園", roma: "kouen" }, { kanji: "神社", roma: "zinzyo" },
+            { kanji: "向日葵", roma: "himawari" }, { kanji: "桜", roma: "sakura" }, { kanji: "紅葉", roma: "momizi" },
+            { kanji: "雪達磨", roma: "yukidaruma" }, { kanji: "蛍", roma: "hotaru" }
+        ];
+
+        let timeLeft = 60;
+        let score = 0;
+        let isPlaying = false;
+        let currentPair = null;
+        let timerId;
+
+        const timerDisplay = document.getElementById('timer');
+        const scoreDisplay = document.getElementById('score');
+        const kanjiContainer = document.getElementById('kanji-container');
+        const romaContainer = document.getElementById('roma-container');
+        const typeInput = document.getElementById('type-input');
+        const startBtn = document.getElementById('start-btn');
+        const startBtnArea = document.getElementById('start-button-area');
+        const retryBtn = document.getElementById('retry-btn');
+        const backToHomeBtn = document.getElementById('back-to-home-btn');
+        const gameView = document.getElementById('game-view');
+        const resultView = document.getElementById('result-view');
+        const finalScore = document.getElementById('final-score');
+        const rankMessage = document.getElementById('rank-message');
+
+        function init() {
+            startBtn.addEventListener('click', startGame);
+            retryBtn.addEventListener('click', startGame);
+            backToHomeBtn.addEventListener('click', resetToHome);
+            typeInput.addEventListener('keydown', filterWrongInput);
+            typeInput.addEventListener('input', checkInput);
+            window.addEventListener('keydown', handleGlobalKeys);
+        }
+
+        function handleGlobalKeys(e) {
+            if (e.key === 'Enter') {
+                if (!isPlaying) startGame();
+            } else if (e.key === 'Escape') {
+                resetToHome();
+            }
+        }
+
+        // Logic to allow both 'zi/ji' and 'zyo/jo'
+        function filterWrongInput(e) {
+            if (!isPlaying) return;
+            if (e.key.length > 1) return;
+
+            const inputSoFar = typeInput.value.toLowerCase();
+            const currentRoma = currentPair.roma;
+            const nextIndex = inputSoFar.length;
+            const nextCharInGuide = currentRoma[nextIndex];
+            const pressedKey = e.key.toLowerCase();
+
+            // Special handling for 'zi' / 'ji'
+            if (currentRoma.substring(nextIndex, nextIndex + 2) === "zi") {
+                if (pressedKey === "z" || pressedKey === "j") return;
+            }
+            if (nextIndex > 0 && inputSoFar[nextIndex - 1] === "j" && currentRoma[nextIndex] === "i") {
+                if (pressedKey === "i") return;
+            }
+
+            // Special handling for 'zyo' / 'jo'
+            // Check for 'z' in 'zyo'
+            if (currentRoma.substring(nextIndex, nextIndex + 3) === "zyo") {
+                if (pressedKey === "z" || pressedKey === "j") return;
+            }
+            // If user typed 'j', allow 'o' next (skipping 'y')
+            if (nextIndex > 0 && inputSoFar[nextIndex - 1] === "j" && currentRoma.substring(nextIndex, nextIndex + 2) === "yo") {
+                if (pressedKey === "o") return;
+            }
+
+            // Standard character check
+            if (pressedKey !== nextCharInGuide) {
+                e.preventDefault();
+            }
+        }
+
+        function startGame() {
+            score = 0;
+            timeLeft = 60;
+            isPlaying = true;
+            scoreDisplay.textContent = score;
+            timerDisplay.textContent = timeLeft + "s";
+            gameView.classList.remove('hidden');
+            resultView.classList.add('hidden');
+            startBtnArea.classList.add('hidden');
+            romaContainer.classList.remove('hidden');
+            typeInput.disabled = false;
+            typeInput.value = "";
+            typeInput.focus();
+            nextWord();
+            if (timerId) clearInterval(timerId);
+            startTimer();
+        }
+
+        function startTimer() {
+            timerId = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = timeLeft + "s";
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function nextWord() {
+            const randomIndex = Math.floor(Math.random() * wordList.length);
+            currentPair = wordList[randomIndex];
+            kanjiContainer.textContent = currentPair.kanji;
+            romaContainer.textContent = currentPair.roma;
+            typeInput.value = "";
+        }
+
+        function checkInput() {
+            if (!isPlaying) return;
+            const val = typeInput.value.toLowerCase();
+            const target = currentPair.roma;
+
+            // Flexible matching for zi/ji and zyo/jo
+            let normalizedVal = val.replace(/ji/g, "zi").replace(/jo/g, "zyo");
+            let normalizedTarget = target.replace(/ji/g, "zi").replace(/jo/g, "zyo");
+
+            if (normalizedVal === normalizedTarget) {
+                score++;
+                scoreDisplay.textContent = score;
+                nextWord();
+            }
+        }
+
+        function endGame() {
+            clearInterval(timerId);
+            isPlaying = false;
+            typeInput.disabled = true;
+            gameView.classList.add('hidden');
+            resultView.classList.remove('hidden');
+            finalScore.textContent = score;
+            if (score >= 50) {
+                rankMessage.textContent = "驚異的なスピード！タイピングマスターです！👑";
+            } else if (score >= 35) {
+                rankMessage.textContent = "すごい！かなりの腕前ですね！🔥";
+            } else if (score >= 20) {
+                rankMessage.textContent = "いい調子です！このまま練習を続けましょう！✨";
+            } else {
+                rankMessage.textContent = "正確に打てるようになりましたね！次はスピードアップ！🌱";
+            }
+        }
+
+        function resetToHome() {
+            clearInterval(timerId);
+            isPlaying = false;
+            gameView.classList.remove('hidden');
+            resultView.classList.add('hidden');
+            startBtnArea.classList.remove('hidden');
+            romaContainer.classList.add('hidden');
+            typeInput.disabled = true;
+            typeInput.value = "";
+            kanjiContainer.innerHTML = '<span class="text-slate-400 text-xl">「Enter」で開始！</span>';
+            romaContainer.textContent = '';
+            timeLeft = 60;
+            score = 0;
+            timerDisplay.textContent = "60s";
+            scoreDisplay.textContent = "0";
+        }
+
+        init();
+    </script>
+</body>
+</html>"

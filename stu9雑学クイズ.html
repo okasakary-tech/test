@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雑学クイズ・マスター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 600px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .option-btn {
+            transition: all 0.2s ease;
+            border: 2px solid #e2e8f0;
+        }
+
+        .option-btn:hover:not(:disabled) {
+            background-color: #f7fafc;
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .correct {
+            background-color: #48bb78 !important;
+            color: white !important;
+            border-color: #48bb78 !important;
+        }
+
+        .wrong {
+            background-color: #f56565 !important;
+            color: white !important;
+            border-color: #f56565 !important;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .progress-bar {
+            height: 8px;
+            background-color: #edf2f7;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .mode-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .mode-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glass-card p-6 md:p-10" id="game-container">
+        <!-- Mode Selection Screen -->
+        <div id="mode-screen" class="text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">🧠 雑学クイズ・マスター</h1>
+            <p class="text-gray-600 mb-8">挑戦したいカテゴリーを選んでください！<br><span class="text-xs">各モード全5問</span></p>
+            
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="startQuiz('school')" class="mode-card bg-orange-100 p-6 rounded-2xl border-2 border-orange-200 text-left flex items-center">
+                    <span class="text-4xl mr-4">🏫</span>
+                    <div>
+                        <div class="font-bold text-orange-800 text-lg">学校生活モード</div>
+                        <p class="text-sm text-orange-600 font-medium">学校や文房具にまつわる驚きの事実</p>
+                    </div>
+                </button>
+                
+                <button onclick="startQuiz('animal')" class="mode-card bg-green-100 p-6 rounded-2xl border-2 border-green-200 text-left flex items-center">
+                    <span class="text-4xl mr-4">🦁</span>
+                    <div>
+                        <div class="font-bold text-green-800 text-lg">動物・生体モード</div>
+                        <p class="text-sm text-green-600 font-medium">生き物の不思議な生態を学ぼう</p>
+                    </div>
+                </button>
+                
+                <button onclick="startQuiz('food')" class="mode-card bg-yellow-100 p-6 rounded-2xl border-2 border-yellow-200 text-left flex items-center">
+                    <span class="text-4xl mr-4">🍕</span>
+                    <div>
+                        <div class="font-bold text-yellow-800 text-lg">食べ物モード</div>
+                        <p class="text-sm text-yellow-600 font-medium">美味しい食べ物の意外な秘密</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider" id="question-counter">Question 1 / 5</span>
+                <span class="text-sm font-semibold text-indigo-600" id="current-score">Score: 0</span>
+            </div>
+            
+            <div class="progress-bar mb-8">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+
+            <div id="question-text" class="text-xl font-bold text-gray-800 mb-8 min-h-[4rem]"></div>
+
+            <div class="grid grid-cols-1 gap-4" id="options-container"></div>
+
+            <div id="feedback" class="mt-6 text-center font-bold text-lg hidden p-4 rounded-xl"></div>
+
+            <div class="mt-8 flex justify-end">
+                <button id="next-btn" class="hidden bg-gray-800 hover:bg-black text-white font-bold py-2 px-6 rounded-lg transition">
+                    次へ進む →
+                </button>
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="hidden text-center">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">結果発表</h2>
+            <div class="text-6xl font-bold text-indigo-600 mb-6" id="final-score">0 / 5</div>
+            <p id="result-message" class="text-gray-600 mb-8 text-lg"></p>
+            <button onclick="location.reload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition duration-300">
+                モード選択に戻る
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const allQuizData = {
+            school: [
+                {
+                    q: "消しゴムで文字が消える理由は、摩擦で削っているからではなく、何をしているから？",
+                    a: ["インクを吸い取っている", "鉛筆の粉を吸着している", "紙の表面を溶かしている", "静電気で飛ばしている"],
+                    correct: 1,
+                    desc: "鉛筆の芯である黒鉛の粉を、消しゴムのゴム成分が絡め取って包み込むことで文字が消えます。"
+                },
+                {
+                    q: "学校のチャイム「キンコンカンコン」のメロディ。元々は何の建物の時計の音？",
+                    a: ["国会議事堂", "ウェストミンスター寺院", "東京タワー", "ピサの斜塔"],
+                    correct: 1,
+                    desc: "イギリスのウェストミンスター寺院にある時計塔（ビッグ・ベン）の鐘の音がモデルです。"
+                },
+                {
+                    q: "世界一長いと言われる、ある国の夏休み。どのくらいある？",
+                    a: ["1ヶ月", "2ヶ月", "3ヶ月", "4ヶ月"],
+                    correct: 2,
+                    desc: "イタリアやアメリカなど、欧米の多くの国では約3ヶ月間の長い夏休みがあります。"
+                },
+                {
+                    q: "学校の黒板。元々の色は「黒」だったが、なぜ今の「緑色」が主流になった？",
+                    a: ["目が疲れにくいから", "塗料が安かったから", "植物を連想させるから", "黒だとチョークが見えにくいから"],
+                    correct: 0,
+                    desc: "1950年代頃から、光の反射が少なくて目が疲れにくい緑色の塗装黒板が普及しました。名前だけ「黒板」として残っています。"
+                },
+                {
+                    q: "ランドセルの発祥と言われる国はどこ？",
+                    a: ["日本", "ドイツ", "オランダ", "イギリス"],
+                    correct: 2,
+                    desc: "江戸時代末期、オランダから伝わった歩兵用の背嚢（はいのう）「ランセル」が語源です。"
+                }
+            ],
+            animal: [
+                {
+                    q: "ラッコが海で寝るとき、流されないように何をする？",
+                    a: ["岩を抱く", "昆布を体に巻く", "仲間と手を繋ぐ", "砂に潜る"],
+                    correct: 1,
+                    desc: "海藻（ケルプなど）を体に巻き付けて、流されないようにアンカー代わりにします。"
+                },
+                {
+                    q: "タコの心臓はいくつある？",
+                    a: ["1つ", "2つ", "3つ", "4つ"],
+                    correct: 2,
+                    desc: "タコには心臓が3つあります。1つは全身に血を送る用、あとの2つはエラに血を送る用です。"
+                },
+                {
+                    q: "ウサギが自分の「ふん」を食べる理由は？",
+                    a: ["お腹が空いたから", "栄養をもう一度吸収するため", "敵にバレないように隠すため", "歯を磨くため"],
+                    correct: 1,
+                    desc: "一度では吸収しきれなかったビタミンなどの栄養を摂取するために、食糞という習性があります。"
+                },
+                {
+                    q: "ペンギンが空を飛べない代わりに、海中で泳ぐ速度は時速何キロくらい？",
+                    a: ["時速約10km", "時速約35km", "時速約60km", "時速約100km"],
+                    correct: 1,
+                    desc: "種類にもよりますが、ジェンツーペンギンなどは時速35km以上で泳ぐことができ、これはオリンピック選手の約4倍の速さです。"
+                },
+                {
+                    q: "パンダの赤ちゃん。生まれた直後の体重は親の何分の一くらい？",
+                    a: ["約10分の1", "約50分の1", "約200分の1", "約1000分の1"],
+                    correct: 3,
+                    desc: "パンダの赤ちゃんは約150g前後で生まれます。親（約100kg以上）の約900〜1000分の1という、哺乳類の中でも極めて小さく生まれる動物です。"
+                }
+            ],
+            food: [
+                {
+                    q: "トウモロコシの「粒」の数と、ある部分の数は必ず同じ。それはどこ？",
+                    a: ["根っこの数", "葉っぱの数", "ヒゲの数", "芯の長さ（mm）"],
+                    correct: 2,
+                    desc: "ヒゲの一本一本が粒の元になる「絹糸」なので、粒の数とヒゲの数は一致します。"
+                },
+                {
+                    q: "ショートケーキの「ショート」の本当の意味は？",
+                    a: ["短い", "足りない", "サクサクした", "小さい"],
+                    correct: 2,
+                    desc: "英語の『short』には「サクサクした」という意味があり、元々はサクサクした生地のお菓子を指していました。"
+                },
+                {
+                    q: "イチゴの表面にあるツブツブ。実はあれ、イチゴの何？",
+                    a: ["種", "果実", "毛", "ゴミ"],
+                    correct: 1,
+                    desc: "あのツブツブ一つ一つが実は「果実」で、中にあるのが種です。"
+                },
+                {
+                    q: "世界で一番食べられている果物は何？",
+                    a: ["リンゴ", "バナナ", "トマト", "ミカン"],
+                    correct: 2,
+                    desc: "植物学的には「果実」に分類されるトマトが、世界で最も生産量・消費量が多いと言われています。"
+                },
+                {
+                    q: "チョコレートの原料「カカオ」。大昔（古代マヤ文明など）は何として使われていた？",
+                    a: ["薬", "建材", "通貨（お金）", "洋服の染料"],
+                    correct: 2,
+                    desc: "カカオ豆は非常に貴重だったため、通貨として流通していました。ウサギ1羽がカカオ豆10粒で買えたという記録もあります。"
+                }
+            ]
+        };
+
+        let currentQuestion = 0;
+        let score = 0;
+        let shuffledQuiz = [];
+
+        const modeScreen = document.getElementById('mode-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const feedback = document.getElementById('feedback');
+        const nextBtn = document.getElementById('next-btn');
+        const progressFill = document.getElementById('progress-fill');
+        const counter = document.getElementById('question-counter');
+        const scoreDisplay = document.getElementById('current-score');
+
+        function startQuiz(mode) {
+            // Pick all 5 questions and shuffle them
+            shuffledQuiz = [...allQuizData[mode]].sort(() => Math.random() - 0.5);
+            currentQuestion = 0;
+            score = 0;
+            modeScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const q = shuffledQuiz[currentQuestion];
+            questionText.innerText = q.q;
+            questionText.className = "text-xl font-bold text-gray-800 mb-8 min-h-[4rem] fade-in";
+            optionsContainer.innerHTML = '';
+            feedback.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+
+            counter.innerText = `Question ${currentQuestion + 1} / ${shuffledQuiz.length}`;
+            progressFill.style.width = `${((currentQuestion) / shuffledQuiz.length) * 100}%`;
+
+            const labels = ['A', 'B', 'C', 'D'];
+            q.a.forEach((option, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn w-full text-left p-4 rounded-xl font-medium text-gray-700 flex items-center bg-white';
+                btn.innerHTML = `<span class="bg-gray-200 text-gray-600 w-8 h-8 rounded-full flex items-center justify-center mr-4 flex-shrink-0 font-bold">${labels[index]}</span> ${option}`;
+                btn.onclick = () => checkAnswer(index, btn);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedIndex, btn) {
+            const q = shuffledQuiz[currentQuestion];
+            const buttons = optionsContainer.querySelectorAll('button');
+            
+            buttons.forEach(b => b.disabled = true);
+
+            if (selectedIndex === q.correct) {
+                btn.classList.add('correct');
+                score++;
+                scoreDisplay.innerText = `Score: ${score}`;
+                feedback.innerText = "✨ 正解！";
+                feedback.className = "mt-6 text-center font-bold text-lg text-green-700 bg-green-50 p-4 rounded-xl border border-green-200 fade-in";
+            } else {
+                btn.classList.add('wrong');
+                buttons[q.correct].classList.add('correct');
+                feedback.innerText = "❌ 残念！";
+                feedback.className = "mt-6 text-center font-bold text-lg text-red-700 bg-red-50 p-4 rounded-xl border border-red-200 fade-in";
+            }
+
+            const desc = document.createElement('p');
+            desc.className = "text-sm text-gray-600 mt-3 font-normal leading-relaxed";
+            desc.innerText = q.desc;
+            feedback.appendChild(desc);
+            feedback.classList.remove('hidden');
+            nextBtn.classList.remove('hidden');
+        }
+
+        nextBtn.onclick = () => {
+            currentQuestion++;
+            if (currentQuestion < shuffledQuiz.length) {
+                showQuestion();
+            } else {
+                showResult();
+            }
+        };
+
+        function showResult() {
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            document.getElementById('final-score').innerText = `${score} / ${shuffledQuiz.length}`;
+            
+            let message = "";
+            if (score === shuffledQuiz.length) message = "完璧です！博士レベルですね！";
+            else if (score >= 4) message = "すごい！かなりの物知りです。";
+            else if (score >= 2) message = "面白い雑学がいっぱいありましたね！";
+            else message = "次は全問正解を目指して頑張りましょう！";
+            
+            document.getElementById('result-message').innerText = message;
+        }
+    </script>
+</body>
+</html>

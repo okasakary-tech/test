@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爆誕！煽りこけしおみくじ・極</title>
+    <style>
+        :root {
+            --wood: #e6c193;
+            --dark-wood: #c7a175;
+            --red: #d9333f;
+            --black: #2d2d2d;
+            --bg: #0f0f0f;
+            --accent: #00ff41;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-area {
+            text-align: center;
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .stage {
+            position: relative;
+            height: 450px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 親こけし */
+        .parent-kokeshi {
+            position: relative;
+            width: 160px;
+            height: 300px;
+            z-index: 20;
+            transition: all 0.4s ease;
+        }
+
+        .kokeshi-half {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .left-side { clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%); }
+        .right-side { clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%); }
+
+        .split .left-side { transform: translateX(-150px) rotate(-30deg); opacity: 0.5; }
+        .split .right-side { transform: translateX(150px) rotate(30deg); opacity: 0.5; }
+
+        .shaking {
+            animation: tremor 0.04s infinite;
+        }
+
+        @keyframes tremor {
+            0% { transform: translate(3px, 3px) rotate(0deg); }
+            50% { transform: translate(-3px, -3px) rotate(1.5deg); }
+            100% { transform: translate(3px, 3px) rotate(-1.5deg); }
+        }
+
+        /* パーツ共通 */
+        .head {
+            width: 120px;
+            height: 120px;
+            background: var(--wood);
+            border-radius: 50%;
+            margin: 0 auto;
+            border: 3px solid var(--dark-wood);
+            position: relative;
+        }
+        .hair { width: 100%; height: 40px; background: var(--black); border-radius: 50% 50% 0 0; }
+        .face { margin-top: 20px; font-size: 24px; text-align: center; color: var(--black); font-weight: bold; }
+        .body-trunk {
+            width: 90px;
+            height: 180px;
+            background: var(--wood);
+            margin: -10px auto 0;
+            border-radius: 30px 30px 10px 10px;
+            border: 3px solid var(--dark-wood);
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 20px, var(--red) 21px);
+        }
+
+        /* 子供こけし（爆誕） */
+        .child-kokeshi {
+            position: absolute;
+            width: 100px;
+            height: 180px;
+            z-index: 10;
+            transform: scale(0) translateY(100px);
+            opacity: 0;
+            transition: all 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.3s;
+        }
+
+        .born .child-kokeshi {
+            transform: scale(1.4) translateY(-30px);
+            opacity: 1;
+        }
+
+        .child-kokeshi .head { width: 80px; height: 80px; border-width: 2px; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+        .child-kokeshi .body-trunk { width: 60px; height: 110px; border-width: 2px; }
+        .child-kokeshi .face { margin-top: 15px; font-size: 18px; }
+
+        /* メッセージエリア */
+        .result-box {
+            position: absolute;
+            top: -100px;
+            width: 100%;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: 0.6s ease 0.9s;
+            z-index: 30;
+        }
+
+        .born .result-box { opacity: 1; transform: translateY(0); }
+
+        .luck { 
+            font-size: 4rem; 
+            font-weight: 900; 
+            color: #ffeb3b; 
+            text-shadow: 0 0 15px #f44336, 0 0 30px #ffeb3b; 
+            margin: 0;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,1));
+        }
+        .insult-container {
+            margin-top: 15px;
+            background: rgba(255, 0, 0, 0.15);
+            border: 2px solid var(--red);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        }
+        .insult { font-size: 1.1rem; color: #fff; line-height: 1.5; margin: 0; font-weight: bold; }
+
+        /* 操作 */
+        button {
+            margin-top: 30px;
+            padding: 18px 60px;
+            font-size: 1.4rem;
+            font-family: inherit;
+            background: linear-gradient(135deg, var(--red), #8e1f1f);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 8px 0 #5a1212;
+            transition: 0.1s;
+            font-weight: bold;
+        }
+
+        button:active { transform: translateY(4px); box-shadow: 0 4px 0 #5a1212; }
+        button:disabled { background: #333; box-shadow: none; color: #666; cursor: wait; }
+
+    </style>
+</head>
+<body>
+
+<div class="game-area">
+    <div class="stage" id="stage">
+        <div class="result-box">
+            <p class="luck" id="luck-text">？？</p>
+            <div class="insult-container">
+                <p class="insult" id="insult-text">タップで運勢を粉砕する</p>
+            </div>
+        </div>
+
+        <div class="parent-kokeshi" id="parent">
+            <div class="kokeshi-half left-side">
+                <div class="head"><div class="hair"></div><div class="face">・ ◡ ・</div></div>
+                <div class="body-trunk"></div>
+            </div>
+            <div class="kokeshi-half right-side">
+                <div class="head"><div class="hair"></div><div class="face">・ ◡ ・</div></div>
+                <div class="body-trunk"></div>
+            </div>
+        </div>
+
+        <div class="child-kokeshi">
+            <div class="head"><div class="hair"></div><div class="face" id="child-face">✧ ꈊ ✧</div></div>
+            <div class="body-trunk"></div>
+        </div>
+    </div>
+
+    <button id="draw-btn" onclick="bornKokeshi()">魂を込めて割る</button>
+</div>
+
+<script>
+    const fortuneData = {
+        "大吉": {
+            face: "≖ ‿ ≖",
+            comments: [
+                "大吉とか、前世でどれだけ媚び売ったの？実力ゼロで笑えるね。",
+                "運を全部ここで使い切ったね。帰り道、頭上に気をつけて歩きなよ。",
+                "すごいね大吉！中身空っぽの君にはこれくらいのボーナスが必要か。",
+                "あーあ。ここで運を使っちゃったから、大事な時に絶対失敗するね。",
+                "大吉を引いただけで勝ち組気分？その安上がりな人生が羨ましいよ。"
+            ]
+        },
+        "中吉": {
+            face: "ー ◡ ー",
+            comments: [
+                "中途半端な中吉。君の人生そのものを象徴してるような結果だね。",
+                "「普通」が服着て歩いてるような君にはお似合い。一生平凡でいなよ。",
+                "リアクションに困る。君の存在感くらい薄い結果だね。",
+                "よかったね、目立たなくて。モブキャラらしくて最高だよ。",
+                "可もなく不可もない。そんな人間を誰も覚えてないけどね。"
+            ]
+        },
+        "小吉": {
+            face: "・ ◡ ・",
+            comments: [
+                "小吉（笑）それで喜べるなんて、本当にハードル低いんだね。",
+                "幸せのハードルが低すぎて羨ましいよ。一生そうやって騙されてな。",
+                "小吉レベルの努力しかしてないもんね。納得の結果だよ。",
+                "小さな幸せで満足してろよ。大きな夢なんて一生見れないんだから。",
+                "まあ、君の器のサイズにはこれくらいがちょうどいいんじゃない？"
+            ]
+        },
+        "吉": {
+            face: "￣ ◡ ￣",
+            comments: [
+                "「吉」って。面白みも何もない。君の会話くらい退屈だね。",
+                "何の感想も出てこない。君の人生のダイジェスト版みたいだ。",
+                "無難。本当に無難。冒険できない臆病者にはお似合いの文字だ。",
+                "吉。これ、おみくじ界の「ゴミ箱」って呼ばれてるの知ってる？",
+                "安定を求めた結果がこれ？退屈すぎて、こけしでもあくびが出るよ。"
+            ]
+        },
+        "末吉": {
+            face: "° ͜ʖ °",
+            comments: [
+                "末吉。どん底の入り口へようこそ。準備はできてる？",
+                "「これから良くなる」って信じてるの？おめでたい頭だね。",
+                "ギリギリセーフだと思ってる？それ、アウトの別名だよ。",
+                "末吉を引いた時のその顔、最高に間抜けで煽りがいがあるよ。",
+                "君のポテンシャルなんて、末吉の「末」の字にも及ばないよ。"
+            ]
+        },
+        "凶": {
+            face: "ಠ_ಠ",
+            comments: [
+                "やっと実力通りの結果が出たね。おめでとう、お似合いだよ。",
+                "凶を引いてショック？自業自得って言葉、辞書で調べてきなよ。",
+                "存在が周囲の迷惑だってことに、おみくじも気づいちゃったかな？",
+                "今日は外に出ないほうがいいよ。周りの運気まで吸い取るから。",
+                "君の不幸が僕のエネルギー。もっと絶望した顔を見せてよ。"
+            ]
+        },
+        "大凶": {
+            face: "益 益",
+            comments: [
+                "大凶！歩く呪物だね。生きてるだけで徳を下げて回るのやめてくれる？",
+                "逆にすごいよ。どうやったらそんなに嫌われる人間になれるの？",
+                "来世に期待しなよ。あ、来世も人間に生まれる確率はゼロだけどね。",
+                "そのまま消えてなくなるのが、唯一世界に貢献できる方法だよ。",
+                "救いようがない。おみくじが君を拒絶してる音が聞こえるよ。"
+            ]
+        }
+    };
+
+    let isBusy = false;
+
+    function bornKokeshi() {
+        if (isBusy) return;
+        isBusy = true;
+
+        const stage = document.getElementById('stage');
+        const parent = document.getElementById('parent');
+        const btn = document.getElementById('draw-btn');
+        const luckText = document.getElementById('luck-text');
+        const insultText = document.getElementById('insult-text');
+        const childFace = document.getElementById('child-face');
+
+        stage.classList.remove('born', 'split');
+        parent.classList.remove('shaking');
+        btn.disabled = true;
+
+        // 1. 激しくシェイク
+        parent.classList.add('shaking');
+
+        setTimeout(() => {
+            parent.classList.remove('shaking');
+            stage.classList.add('split');
+
+            // 運勢選択
+            const keys = Object.keys(fortuneData);
+            const luck = keys[Math.floor(Math.random() * keys.length)];
+            const info = fortuneData[luck];
+            const comment = info.comments[Math.floor(Math.random() * info.comments.length)];
+
+            luckText.innerText = luck;
+            insultText.innerText = comment;
+            childFace.innerText = info.face;
+
+            setTimeout(() => {
+                stage.classList.add('born');
+                
+                setTimeout(() => {
+                    btn.disabled = false;
+                    isBusy = false;
+                }, 1500);
+            }, 100);
+
+        }, 1200);
+    }
+</script>
+
+</body>
+</html>

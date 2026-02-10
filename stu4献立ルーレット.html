@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>献立ルーレット - 今日のごはん決定！</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap');
+
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #fffaf0;
+        }
+
+        .roulette-container {
+            position: relative;
+            width: 260px;
+            height: 260px;
+            margin: 0 auto;
+        }
+
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 8px solid #f87171;
+            position: relative;
+            transition: transform 3s cubic-bezier(0.1, 0, 0.1, 1);
+            overflow: hidden;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .marker {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #ef4444;
+            z-index: 10;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #ff0;
+            animation: fall 3s linear forwards;
+            pointer-events: none;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+
+        .genre-btn.active {
+            background-color: #ef4444;
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-item {
+            animation: slideIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-orange-100">
+        <!-- Header -->
+        <div class="bg-orange-400 p-6 text-white text-center">
+            <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+                <span>🍳</span> 献立ルーレット
+            </h1>
+            <p class="text-sm opacity-90 mt-1">今日のラッキーメニューを複数提案！</p>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- Ingredients Input -->
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">使いたい食材（カンマ区切り）</label>
+                <input type="text" id="ingredients" placeholder="例: 鶏肉, 玉ねぎ, キャベツ" 
+                    class="w-full px-4 py-3 rounded-xl border-2 border-orange-100 focus:border-orange-400 focus:outline-none transition-colors"
+                    value="鶏肉, 玉ねぎ">
+            </div>
+
+            <!-- Genre Selection -->
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">ジャンルを選択</label>
+                <div class="grid grid-cols-3 gap-2" id="genre-container">
+                    <button class="genre-btn py-2 px-1 rounded-lg border-2 border-orange-100 text-sm font-medium transition-all active" data-genre="和食">和食</button>
+                    <button class="genre-btn py-2 px-1 rounded-lg border-2 border-orange-100 text-sm font-medium transition-all" data-genre="洋食">洋食</button>
+                    <button class="genre-btn py-2 px-1 rounded-lg border-2 border-orange-100 text-sm font-medium transition-all" data-genre="中華">中華</button>
+                    <button class="genre-btn py-2 px-1 rounded-lg border-2 border-orange-100 text-sm font-medium transition-all" data-genre="エスニック">エスニック</button>
+                    <button class="genre-btn py-2 px-1 rounded-lg border-2 border-orange-100 text-sm font-medium transition-all" data-genre="麺類">麺類</button>
+                    <button class="genre-btn py-2 px-1 rounded-lg border-2 border-orange-100 text-sm font-medium transition-all" data-genre="おつまみ">おつまみ</button>
+                </div>
+            </div>
+
+            <!-- Roulette Wheel Visual -->
+            <div class="py-2">
+                <div class="roulette-container">
+                    <div class="marker"></div>
+                    <div id="wheel" class="wheel">
+                        <div class="text-center">
+                            <span id="center-icon" class="text-6xl transition-all duration-75">🤔</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spin Button -->
+            <button id="spin-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl shadow-lg transform active:scale-95 transition-all text-xl">
+                ルーレットを回す！
+            </button>
+
+            <!-- Result Message Area -->
+            <div id="result-container" class="hidden space-y-3">
+                <p class="text-center text-xs text-yellow-600 font-bold uppercase tracking-widest">✨ おすすめの候補 ✨</p>
+                <div id="result-list" class="space-y-3">
+                    <!-- Results will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const menuDatabase = {
+            "和食": [
+                { name: "親子丼", items: ["鶏肉", "玉ねぎ", "卵"] },
+                { name: "豚の生姜焼き", items: ["豚肉", "玉ねぎ", "キャベツ"] },
+                { name: "肉じゃが", items: ["牛肉", "豚肉", "じゃがいも", "玉ねぎ", "人参"] },
+                { name: "ブリ大根", items: ["魚", "大根"] },
+                { name: "鮭のムニエル和風", items: ["魚", "きのこ"] },
+                { name: "野菜炒め", items: ["キャベツ", "豚肉", "もやし", "人参"] },
+                { name: "照り焼きチキン", items: ["鶏肉"] },
+                { name: "筑前煮", items: ["鶏肉", "人参", "ごぼう", "れんこん"] }
+            ],
+            "洋食": [
+                { name: "オムライス", items: ["卵", "鶏肉", "玉ねぎ"] },
+                { name: "ハンバーグ", items: ["ひき肉", "玉ねぎ"] },
+                { name: "ポトフ", items: ["ソーセージ", "キャベツ", "じゃがいも", "玉ねぎ"] },
+                { name: "チキングリル", items: ["鶏肉", "じゃがいも"] },
+                { name: "クリームシチュー", items: ["鶏肉", "玉ねぎ", "人参", "じゃがいも"] },
+                { name: "グラタン", items: ["マカロニ", "鶏肉", "玉ねぎ", "チーズ"] },
+                { name: "ロールキャベツ", items: ["キャベツ", "ひき肉"] }
+            ],
+            "中華": [
+                { name: "麻婆豆腐", items: ["豆腐", "ひき肉"] },
+                { name: "回鍋肉", items: ["豚肉", "キャベツ", "ピーマン"] },
+                { name: "青椒肉絲", items: ["牛肉", "ピーマン", "たけのこ"] },
+                { name: "エビチリ", items: ["エビ", "ねぎ"] },
+                { name: "八宝菜", items: ["白菜", "豚肉", "エビ", "うずら"] },
+                { name: "餃子", items: ["ひき肉", "キャベツ", "ニラ"] },
+                { name: "チャーハン", items: ["卵", "ねぎ", "ハム", "ご飯"] }
+            ],
+            "エスニック": [
+                { name: "ガパオライス", items: ["ひき肉", "卵", "パプリカ", "バジル"] },
+                { name: "グリーンカレー", items: ["鶏肉", "なす", "たけのこ"] },
+                { name: "タコライス", items: ["ひき肉", "レタス", "トマト", "チーズ"] },
+                { name: "ナシゴレン", items: ["エビ", "鶏肉", "卵"] },
+                { name: "フォー", items: ["鶏肉", "もやし", "麺"] }
+            ],
+            "麺類": [
+                { name: "ソース焼きそば", items: ["キャベツ", "豚肉", "麺"] },
+                { name: "ミートソースパスタ", items: ["ひき肉", "玉ねぎ", "パスタ"] },
+                { name: "うどん", items: ["うどん", "油揚げ", "卵"] },
+                { name: "冷やし中華", items: ["きゅうり", "ハム", "卵", "麺"] },
+                { name: "カルボナーラ", items: ["パスタ", "卵", "ベーコン", "チーズ"] }
+            ],
+            "おつまみ": [
+                { name: "枝豆チーズ", items: ["枝豆", "チーズ"] },
+                { name: "冷奴アレンジ", items: ["豆腐", "キムチ", "ねぎ"] },
+                { name: "ジャーマンポテト", items: ["じゃがいも", "ベーコン"] },
+                { name: "アサリの酒蒸し", items: ["アサリ"] },
+                { name: "だし巻き卵", items: ["卵"] }
+            ]
+        };
+
+        const foodEmojis = ["🍕", "🍣", "🍔", "🍜", "🥗", "🍛", "🍢", "🍲", "🍝", "🥩", "🍗", "🥟", "🍤", "🍱"];
+
+        let currentGenre = "和食";
+        let isSpinning = false;
+
+        // ジャンルボタン切り替え
+        document.querySelectorAll('.genre-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isSpinning) return;
+                document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentGenre = btn.dataset.genre;
+            });
+        });
+
+        // ルーレットの実行
+        document.getElementById('spin-btn').addEventListener('click', () => {
+            if (isSpinning) return;
+
+            const inputVal = document.getElementById('ingredients').value;
+            const inputIngredients = inputVal.split(/[,、\s]+/).filter(i => i !== "");
+            
+            if (inputIngredients.length === 0) {
+                alert("食材を1つ以上入力してください！");
+                return;
+            }
+
+            startSpin(inputIngredients);
+        });
+
+        function startSpin(inputIngredients) {
+            isSpinning = true;
+            const wheel = document.getElementById('wheel');
+            const container = document.getElementById('result-container');
+            const centerIcon = document.getElementById('center-icon');
+            
+            container.classList.add('hidden');
+
+            // 絵文字をランダムに変えるタイマー
+            const emojiInterval = setInterval(() => {
+                const randomEmoji = foodEmojis[Math.floor(Math.random() * foodEmojis.length)];
+                centerIcon.innerText = randomEmoji;
+            }, 100);
+
+            // 回転アニメーション
+            const randomDegree = 1800 + Math.floor(Math.random() * 360);
+            wheel.style.transform = `rotate(${randomDegree}deg)`;
+
+            setTimeout(() => {
+                clearInterval(emojiInterval);
+                const results = selectMultipleMenus(inputIngredients);
+                displayResults(results);
+                isSpinning = false;
+                centerIcon.innerText = "✨";
+                createConfetti();
+            }, 3000);
+        }
+
+        function selectMultipleMenus(userIngredients) {
+            const genreList = menuDatabase[currentGenre];
+            
+            // 入力食材が含まれるメニューを探す
+            let matches = genreList.filter(menu => {
+                return menu.items.some(item => 
+                    userIngredients.some(userInput => userInput.includes(item) || item.includes(userInput))
+                );
+            });
+
+            // 候補が少ない場合は、ジャンル全体から補填
+            let finalSelection = [...matches];
+            if (finalSelection.length < 3) {
+                const remaining = genreList.filter(m => !finalSelection.includes(m));
+                const shuffled = remaining.sort(() => 0.5 - Math.random());
+                finalSelection = finalSelection.concat(shuffled.slice(0, 3 - finalSelection.length));
+            }
+
+            return finalSelection.sort(() => 0.5 - Math.random()).slice(0, 3).map(menu => {
+                const isMatch = matches.includes(menu);
+                return {
+                    name: menu.name,
+                    desc: isMatch ? `「${userIngredients.join('、')}」にピッタリ！` : `${currentGenre}の定番メニューです！`,
+                    badge: isMatch ? "マッチ！" : "おすすめ"
+                };
+            });
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('result-container');
+            const list = document.getElementById('result-list');
+            list.innerHTML = '';
+
+            results.forEach((menu, index) => {
+                const div = document.createElement('div');
+                div.className = "result-item p-4 bg-yellow-50 border-2 border-yellow-200 rounded-2xl flex items-center justify-between";
+                div.style.animationDelay = `${index * 0.2}s`;
+                
+                div.innerHTML = `
+                    <div>
+                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold mb-1 ${menu.badge === 'マッチ！' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}">
+                            ${menu.badge}
+                        </span>
+                        <h3 class="text-lg font-bold text-gray-800">${menu.name}</h3>
+                        <p class="text-xs text-gray-500">${menu.desc}</p>
+                    </div>
+                    <div class="text-2xl">🍱</div>
+                `;
+                list.appendChild(div);
+            });
+
+            container.classList.remove('hidden');
+        }
+
+        function createConfetti() {
+            for (let i = 0; i < 40; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                confetti.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 3000);
+            }
+        }
+    </script>
+</body>
+</html>

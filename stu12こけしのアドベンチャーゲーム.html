@@ -1,0 +1,564 @@
+"<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kokeshi's Adventure - Boss Fight Update</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f3e5ab;
+            font-family: 'Sawarabi Mincho', serif;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #0f172a 0%, #4c1d95 50%, #831843 100%);
+            overflow: hidden;
+        }
+
+        .mountain-far {
+            position: absolute;
+            bottom: 100px;
+            width: 100%;
+            height: 400px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 100 L30 40 L60 80 L80 20 L100 100 Z" fill="%231e293b" opacity="0.5"/></svg>');
+            background-repeat: repeat-x;
+            background-size: 800px 400px;
+            z-index: 1;
+        }
+
+        #world {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        .ground-segment {
+            position: absolute;
+            bottom: 0;
+            height: 100px;
+            background: linear-gradient(to bottom, #2d1b0f 0%, #000000 100%);
+            border-top: 6px solid #b91c1c;
+        }
+
+        .platform {
+            position: absolute;
+            background: #4c1d95;
+            border: 3px solid #1a1a1a;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+            z-index: 12;
+        }
+
+        .spike {
+            position: absolute;
+            width: 40px;
+            height: 30px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 30"><path d="M0 30 L10 0 L20 30 L30 0 L40 30 Z" fill="%23ff0000" stroke="white" stroke-width="1"/></svg>');
+            z-index: 15;
+        }
+
+        .kokeshi {
+            width: 50px;
+            height: 100px;
+            position: absolute;
+            z-index: 35;
+            filter: drop-shadow(4px 4px 6px rgba(0,0,0,0.5));
+            transform-origin: bottom center;
+        }
+
+        .villager {
+            width: 50px;
+            height: 100px;
+            position: absolute;
+            z-index: 30;
+        }
+
+        .enemy {
+            width: 50px;
+            height: 80px;
+            position: absolute;
+            z-index: 30;
+        }
+
+        .boss {
+            width: 120px;
+            height: 200px;
+            position: absolute;
+            z-index: 40;
+            filter: drop-shadow(0 0 20px rgba(255,0,0,0.5));
+            transition: transform 0.1s;
+        }
+
+        .item {
+            width: 60px;
+            height: 60px;
+            position: absolute;
+            z-index: 20;
+            animation: bounce 0.8s infinite alternate;
+            display: none;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0) scale(1); }
+            to { transform: translateY(-20px) scale(1.1); }
+        }
+
+        .dialog-box {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%;
+            max-width: 600px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 5px solid #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            cursor: pointer;
+            z-index: 200;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .btn {
+            width: 85px;
+            height: 85px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(8px);
+            border: 4px solid rgba(255,255,255,0.8);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            cursor: pointer;
+            user-select: none;
+            pointer-events: auto;
+            transition: background 0.1s;
+        }
+        
+        .btn:active { background: rgba(255, 255, 255, 0.5); }
+
+        #overlay, #clear-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 300;
+            text-align: center;
+        }
+        #overlay { background: rgba(0,0,0,0.9); }
+        #clear-screen { 
+            background: radial-gradient(circle, rgba(218,165,32,0.95) 0%, rgba(139,69,19,0.98) 100%);
+            display: none;
+        }
+
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            25% { transform: translate(-10px, 10px); }
+            50% { transform: translate(10px, -10px); }
+            75% { transform: translate(-10px, -10px); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="bg-far" class="mountain-far"></div>
+    <div id="world"></div>
+
+    <div id="player" class="kokeshi">
+        <svg viewBox="0 0 60 130" class="w-full h-full">
+            <defs>
+                <radialGradient id="woodGrad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" style="stop-color:#f8ead6" />
+                    <stop offset="100%" style="stop-color:#e6d5bc" />
+                </radialGradient>
+            </defs>
+            <circle cx="30" cy="35" r="28" fill="url(#woodGrad)" stroke="#3d2b1f" stroke-width="2"/>
+            <path d="M10 25 Q30 5 50 25" fill="none" stroke="#333" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="30" cy="10" r="4" fill="#e63946" />
+            <path d="M22 32 Q25 30 28 32" fill="none" stroke="#333" stroke-width="1.5"/>
+            <path d="M32 32 Q35 30 38 32" fill="none" stroke="#333" stroke-width="1.5"/>
+            <path d="M26 48 Q30 52 34 48" fill="none" stroke="#e63946" stroke-width="2"/>
+            <path d="M18 63 Q12 125 18 125 L42 125 Q48 125 42 63 Z" fill="url(#woodGrad)" stroke="#3d2b1f" stroke-width="2"/>
+        </svg>
+    </div>
+
+    <div id="dialog" class="dialog-box">
+        <div id="dialog-name" class="font-bold text-red-700 text-xl mb-1"></div>
+        <div id="dialog-text" class="text-lg"></div>
+        <div class="text-xs text-blue-500 mt-2 text-right">クリックで閉じる</div>
+    </div>
+
+    <div class="controls">
+        <div class="flex gap-4">
+            <div class="btn" id="btn-left">←</div>
+            <div class="btn" id="btn-right">→</div>
+        </div>
+        <div class="btn" id="btn-jump">↑</div>
+    </div>
+
+    <div id="overlay">
+        <h1 class="text-5xl md:text-6xl mb-6 font-bold text-red-600">真・こけしのアドベンチャー</h1>
+        <p class="text-xl mb-8 text-gray-400">足場を使いこなし、失われた筆を取り戻せ</p>
+        <button id="start-btn" class="bg-red-700 hover:bg-red-800 text-white px-12 py-4 rounded-full text-2xl font-bold shadow-xl transition-all active:scale-95 pointer-events-auto">
+            冒険を始める
+        </button>
+    </div>
+
+    <div id="clear-screen">
+        <h1 class="text-6xl md:text-8xl mb-8 font-bold text-yellow-400">祝・完全制覇</h1>
+        <button onclick="location.reload()" class="bg-white text-yellow-900 px-10 py-4 rounded-full text-xl font-bold">
+            もう一度遊ぶ
+        </button>
+    </div>
+</div>
+
+<script>
+    const world = document.getElementById('world');
+    const player = document.getElementById('player');
+    const bgFar = document.getElementById('bg-far');
+    const dialog = document.getElementById('dialog');
+    const dialogText = document.getElementById('dialog-text');
+    const dialogName = document.getElementById('dialog-name');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('start-btn');
+    const clearScreen = document.getElementById('clear-screen');
+
+    const GRAVITY = 0.7;
+    const JUMP_FORCE = -17.5;
+    const GROUND_Y = 100;
+
+    let gameState = {
+        playerX: 200,
+        playerY: GROUND_Y,
+        velY: 0,
+        isJumping: false,
+        worldOffset: 0,
+        isDialogOpen: false,
+        gameBeaten: false,
+        enemies: [],
+        spikes: [],
+        storyStep: 0,
+        isStarted: false
+    };
+
+    const config = {
+        speed: 8.5,
+        worldWidth: 10000,
+        ground: [
+            { x: 0, w: 1200 },    
+            { x: 1750, w: 1650 }, 
+            { x: 3900, w: 2000 }, 
+            { x: 6500, w: 3500 }  
+        ],
+        platforms: [
+            // 第一のエリア
+            { x: 1250, y: 250, w: 200, h: 30 },
+            { x: 1500, y: 400, w: 200, h: 30 }, 
+            
+            // 第二のエリア
+            { x: 2100, y: 350, w: 600, h: 30 }, 
+            { x: 3400, y: 300, w: 300, h: 30 },
+            { x: 3700, y: 500, w: 300, h: 30 },
+
+            // 第三のエリア
+            { x: 5950, y: 300, w: 200, h: 30 },
+            { x: 6200, y: 450, w: 250, h: 30 },
+            
+            // ボスエリア周辺：足場を追加 (指定された右側の空中付近)
+            { x: 7400, y: 300, w: 300, h: 30 },
+            { x: 7800, y: 450, w: 300, h: 30 }, // ボスの少し手前・高所
+            { x: 8200, y: 550, w: 400, h: 30 }, // ボスの上空を通れるルート
+            { x: 8800, y: 400, w: 350, h: 30 }
+        ],
+        enemies: [
+            { x: 800, y: GROUND_Y, range: 300, speed: 4 },
+            { x: 2200, y: 350, range: 400, speed: 3, onPlatform: true },
+            { x: 4500, y: GROUND_Y, range: 800, speed: 7 },
+            { x: 7000, y: GROUND_Y, range: 500, speed: 5 }
+        ],
+        spikes: [
+            { x: 2100, y: GROUND_Y }, { x: 2250, y: GROUND_Y },
+            { x: 4100, y: GROUND_Y }, { x: 4300, y: GROUND_Y },
+            { x: 6800, y: GROUND_Y }
+        ],
+        boss: { x: 8000, y: GROUND_Y, range: 800, hp: 3, dead: false },
+        villager: { x: 500, y: GROUND_Y, name: "村長こけし", text: "おやおや、大切な『心の筆』をなくしてしまったのかい？ 右の方へ飛んでいったのを見たよ。空中の足場をうまく乗り継いでいくんじゃ。無理せずジャンプするのじゃよ！" }
+    };
+
+    function createKokeshiSVG(color = "#f8ead6") {
+        return `<svg viewBox="0 0 60 130" class="w-full h-full">
+            <circle cx="30" cy="35" r="28" fill="${color}" stroke="#3d2b1f" stroke-width="2"/>
+            <path d="M10 25 Q30 5 50 25" fill="none" stroke="#333" stroke-width="4" stroke-linecap="round"/>
+            <path d="M22 32 Q25 30 28 32" fill="none" stroke="#333" stroke-width="1.5"/>
+            <path d="M32 32 Q35 30 38 32" fill="none" stroke="#333" stroke-width="1.5"/>
+            <path d="M18 63 Q12 125 18 125 L42 125 Q48 125 42 63 Z" fill="${color}" stroke="#3d2b1f" stroke-width="2"/>
+        </svg>`;
+    }
+
+    function createEnemySVG(isBoss = false) {
+        const color = isBoss ? "#581c87" : "#333";
+        return `<svg viewBox="0 0 60 130" class="w-full h-full">
+            <circle cx="30" cy="35" r="28" fill="${color}" stroke="#000" stroke-width="2"/>
+            <path d="M15 30 L25 40 M45 30 L35 40" stroke="red" stroke-width="4"/>
+            <path d="M18 63 Q12 125 18 125 L42 125 Q48 125 42 63 Z" fill="#222" stroke="#000" stroke-width="2"/>
+        </svg>`;
+    }
+
+    function init() {
+        world.innerHTML = '';
+        config.ground.forEach(g => {
+            const el = document.createElement('div');
+            el.className = 'ground-segment';
+            el.style.left = g.x + 'px'; el.style.width = g.w + 'px';
+            world.appendChild(el);
+        });
+
+        const villagerEl = document.createElement('div');
+        villagerEl.className = 'villager';
+        villagerEl.style.left = config.villager.x + 'px';
+        villagerEl.style.bottom = config.villager.y + 'px';
+        villagerEl.innerHTML = createKokeshiSVG("#dbeafe");
+        world.appendChild(villagerEl);
+
+        config.platforms.forEach(p => {
+            const el = document.createElement('div');
+            el.className = 'platform';
+            el.style.left = p.x + 'px'; el.style.bottom = p.y + 'px';
+            el.style.width = p.w + 'px'; el.style.height = p.h + 'px';
+            world.appendChild(el);
+        });
+
+        config.spikes.forEach(s => {
+            const el = document.createElement('div');
+            el.className = 'spike';
+            el.style.left = s.x + 'px'; el.style.bottom = s.y + 'px';
+            world.appendChild(el);
+            gameState.spikes.push(s);
+        });
+
+        gameState.enemies = [];
+        config.enemies.forEach(e => {
+            const el = document.createElement('div');
+            el.className = 'enemy';
+            el.innerHTML = createEnemySVG();
+            world.appendChild(el);
+            gameState.enemies.push({ ...e, currentX: e.x, dir: 1, element: el });
+        });
+
+        const bossEl = document.createElement('div');
+        bossEl.className = 'boss';
+        bossEl.innerHTML = createEnemySVG(true);
+        world.appendChild(bossEl);
+        gameState.boss = { ...config.boss, currentX: config.boss.x, dir: 1, element: bossEl };
+
+        const target = document.createElement('div');
+        target.id = 'goal';
+        target.className = 'item';
+        target.style.left = '9500px'; target.style.bottom = '100px';
+        target.innerHTML = `<svg viewBox="0 0 50 50"><path d="M25 0 L40 40 L10 40 Z" fill="gold" stroke="white" stroke-width="2"/></svg>`;
+        world.appendChild(target);
+
+        gameState.isStarted = true;
+        requestAnimationFrame(gameLoop);
+    }
+
+    const keys = {};
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    const btns = { left: false, right: false };
+    document.getElementById('btn-left').onpointerdown = (e) => { e.preventDefault(); btns.left = true; };
+    document.getElementById('btn-right').onpointerdown = (e) => { e.preventDefault(); btns.right = true; };
+    document.getElementById('btn-jump').onpointerdown = (e) => { e.preventDefault(); jump(); };
+    
+    window.addEventListener('pointerup', () => { btns.left = false; btns.right = false; });
+    window.addEventListener('pointercancel', () => { btns.left = false; btns.right = false; });
+
+    function jump() {
+        if (!gameState.isJumping && !gameState.isDialogOpen && gameState.isStarted) {
+            gameState.velY = JUMP_FORCE;
+            gameState.isJumping = true;
+        }
+    }
+
+    function showDialog(name, text) {
+        dialogName.innerText = name;
+        dialogText.innerText = text;
+        dialog.style.display = 'block';
+        gameState.isDialogOpen = true;
+    }
+
+    dialog.addEventListener('click', () => {
+        dialog.style.display = 'none';
+        gameState.isDialogOpen = false;
+        if (gameState.storyStep === 1) gameState.storyStep = 2;
+    });
+
+    function gameLoop() {
+        if (!gameState.isStarted || gameState.gameBeaten) return;
+
+        if (!gameState.isDialogOpen) {
+            let move = 0;
+            if (keys['ArrowRight'] || keys['KeyD'] || btns.right) move = config.speed;
+            if (keys['ArrowLeft'] || keys['KeyA'] || btns.left) move = -config.speed;
+            if (keys['ArrowUp'] || keys['KeyW'] || keys['Space']) jump();
+            
+            if (move !== 0) {
+                gameState.playerX += move;
+                player.style.transform = `scaleX(${move > 0 ? 1 : -1})`;
+            }
+
+            gameState.velY += GRAVITY;
+            gameState.playerY -= gameState.velY;
+
+            if (gameState.storyStep === 0 && gameState.playerX > config.villager.x - 50) {
+                showDialog(config.villager.name, config.villager.text);
+                gameState.storyStep = 1;
+            }
+
+            let onSolid = false;
+            
+            config.ground.forEach(g => {
+                if (gameState.playerX > g.x && gameState.playerX < g.x + g.w) {
+                    if (gameState.playerY <= GROUND_Y && gameState.velY >= 0) {
+                        gameState.playerY = GROUND_Y;
+                        gameState.velY = 0;
+                        gameState.isJumping = false;
+                        onSolid = true;
+                    }
+                }
+            });
+
+            config.platforms.forEach(p => {
+                const top = p.y + p.h;
+                if (gameState.velY >= 0 && gameState.playerX > p.x - 10 && gameState.playerX < p.x + p.w + 10) {
+                    if (gameState.playerY <= top && gameState.playerY >= top - 25) {
+                        gameState.playerY = top;
+                        gameState.velY = 0;
+                        gameState.isJumping = false;
+                        onSolid = true;
+                    }
+                }
+            });
+
+            if (gameState.playerY < -300) respawn();
+
+            gameState.spikes.forEach(s => {
+                if (Math.abs(gameState.playerX - (s.x + 20)) < 30 && Math.abs(gameState.playerY - s.y) < 30) respawn();
+            });
+
+            gameState.enemies.forEach(e => {
+                e.currentX += e.speed * e.dir;
+                if (e.currentX > e.x + e.range || e.currentX < e.x) e.dir *= -1;
+                e.element.style.left = e.currentX + 'px';
+                e.element.style.bottom = (e.onPlatform ? e.y + 30 : e.y) + 'px';
+
+                if (Math.abs(gameState.playerX - e.currentX) < 40 && Math.abs(gameState.playerY - (e.onPlatform ? e.y + 30 : e.y)) < 60) {
+                    if (gameState.velY > 0 && gameState.playerY > (e.onPlatform ? e.y + 30 : e.y) + 30) {
+                        e.currentX = -2000; e.element.style.display = 'none';
+                        gameState.velY = JUMP_FORCE * 0.7;
+                    } else respawn();
+                }
+            });
+
+            const boss = gameState.boss;
+            if (!boss.dead) {
+                boss.currentX += 6 * boss.dir;
+                if (boss.currentX > boss.x + boss.range || boss.currentX < boss.x) boss.dir *= -1;
+                boss.element.style.left = boss.currentX + 'px';
+                boss.element.style.bottom = boss.y + 'px';
+
+                // ボスの当たり判定の修正
+                const bossCenterX = boss.currentX + 60;
+                const distH = Math.abs(gameState.playerX - bossCenterX);
+                const distV = gameState.playerY - boss.y;
+
+                // 踏みつけ判定 (プレイヤーが落下中で、かつボスの頭部付近にいる場合)
+                if (distH < 90 && distV > 150 && distV < 220 && gameState.velY > 0) {
+                    boss.hp--;
+                    gameState.velY = JUMP_FORCE * 1.1; // 踏んだ時に高く跳ねる
+                    // ダメージエフェクト（赤く光らせる）
+                    boss.element.style.filter = "drop-shadow(0 0 40px rgba(255,255,255,1)) brightness(2)";
+                    setTimeout(() => {
+                        boss.element.style.filter = "drop-shadow(0 0 20px rgba(255,0,0,0.5))";
+                    }, 200);
+
+                    if (boss.hp <= 0) {
+                        boss.dead = true; boss.element.style.display = 'none';
+                        document.getElementById('goal').style.display = 'block';
+                    }
+                } 
+                // ダメージ判定 (踏みつけ以外で接触した場合)
+                else if (distH < 70 && distV < 180) {
+                    respawn();
+                }
+            }
+
+            if (boss.dead && gameState.playerX > 9400) {
+                gameState.gameBeaten = true;
+                clearScreen.style.display = 'flex';
+            }
+        }
+
+        updateView();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function respawn() {
+        document.getElementById('game-container').classList.add('shake');
+        setTimeout(() => document.getElementById('game-container').classList.remove('shake'), 500);
+        gameState.playerX = 200; gameState.playerY = GROUND_Y; gameState.velY = 0;
+        gameState.isJumping = false;
+    }
+
+    function updateView() {
+        const sw = window.innerWidth;
+        gameState.worldOffset = Math.min(0, Math.max(-(config.worldWidth - sw), -(gameState.playerX - sw / 2)));
+        world.style.transform = `translateX(${gameState.worldOffset}px)`;
+        bgFar.style.transform = `translateX(${gameState.worldOffset * 0.2}px)`;
+        player.style.left = (gameState.playerX + gameState.worldOffset) + 'px';
+        player.style.bottom = gameState.playerY + 'px';
+    }
+
+    startBtn.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        init();
+    });
+</script>
+</body>
+</html>"
